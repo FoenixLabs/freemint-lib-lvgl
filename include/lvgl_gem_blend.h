@@ -1,5 +1,6 @@
 #ifndef LVGL_GEM_BLEND_H
 #define LVGL_GEM_BLEND_H
+#include <string.h>
 #include "src/draw/sw/blend/lv_draw_sw_blend_private.h"
 /* v9.2.2's generic masked/opacity RGB888 fill takes bytes from numeric
  * AARRGGBB. On a big-endian CPU those are not B,G,R. Use the upstream custom
@@ -8,6 +9,17 @@ static inline lv_result_t lg_blend_rgb_fill(lv_draw_sw_blend_fill_dsc_t *d,unsig
  int32_t x,y;uint8_t source[3];
  if(size!=3&&size!=4)return LV_RESULT_INVALID;
  source[0]=d->color.blue;source[1]=d->color.green;source[2]=d->color.red;
+ /* Opaque rectangles need no per-pixel opacity/mask decisions. Build the
+  * first row, then copy its bytes; preserve destination row padding. */
+ if(!d->mask_buf&&d->opa>=LV_OPA_MAX&&d->dest_w>0&&d->dest_h>0){
+  uint8_t *first=d->dest_buf,*p=first;
+  for(x=0;x<d->dest_w;x++,p+=size){
+   p[0]=source[0];p[1]=source[1];p[2]=source[2];if(size==4)p[3]=255;
+  }
+  for(y=1;y<d->dest_h;y++)memcpy(first+y*d->dest_stride,first,(size_t)d->dest_w*size);
+  return LV_RESULT_OK;
+ }
+
  for(y=0;y<d->dest_h;y++){
   uint8_t *row=(uint8_t*)d->dest_buf+y*d->dest_stride;
   const lv_opa_t *mask=d->mask_buf?d->mask_buf+y*d->mask_stride:NULL;

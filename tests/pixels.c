@@ -45,5 +45,15 @@ int main(void){
   lg_pixel888_native(data,1,16,x,255-x,x/2);
   assert((((unsigned)data[2]<<8)|data[3])==((x/8)*2048+((255-x)/4)*32+(x/2)/8));
  }
+ {
+  unsigned depth,n,offset;uint8_t src[641*3],ref[2600],actual[2600];
+  for(x=0;x<sizeof src;x++)src[x]=(x*73+17)&255;
+  for(depth=16;depth<=32;depth+=16)for(i=0;i<sizeof(widths)/sizeof(*widths);i++)for(offset=0;offset<3;offset++){
+   n=widths[i];memset(ref,0x5a,sizeof ref);memset(actual,0x5a,sizeof actual);
+   for(x=0;x<n;x++)lg_pixel888_native(ref+offset,x,depth,src[3*x+2],src[3*x+1],src[3*x]);
+   lg_span888_native(actual+offset,src,n,depth);assert(!memcmp(ref,actual,sizeof ref));
+  }
+  lg_span888_native(actual,src,0,32);assert(!memcmp(ref,actual,sizeof ref));
+ }
  puts("geometry, padding, mono masks and all RGB565 values passed");return 0;
 }

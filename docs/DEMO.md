@@ -40,7 +40,7 @@ only with the fVDI cookie present and exact channel maps; its newer extra fields
 are not interpreted as an EdDI 1.1 promise. Cookie lookup uses MiNT Ssystem, with
 no application supervisor fallback or direct hardware access.
 
-LVGL renders into a 32-row RGB888 strip. Its explicit B,G,R bytes avoid the pinned
+LVGL renders into a 100-row RGB888 strip. Its explicit B,G,R bytes avoid the pinned
 version's CPU-dependent RGB565 bitfields and preserve full eight-bit colour.
 The project supplies byte-explicit C fill hooks through LVGL's custom-blender
 interface to correct the pinned version's little-endian assumptions in opacity/
@@ -50,10 +50,15 @@ Conversion writes native big-endian 565 or FF/R/G/B into the owned backing MFDB.
 path uses stable ordered dithering and VDI black/white expansion.
 
 MFDB `fd_wdwidth` is padded pixel width divided by 16, independently of depth.
-The 600×400 native 32-bit backing is 972,800 bytes, draw strip 57,600 bytes, and the LVGL
+The 600×400 native 32-bit backing is 972,800 bytes, draw strip 180,000 bytes, and the LVGL
 heap1 MiB, plus code, fonts/assets,128 KiB stack and allocation overhead. No screen
 pointer or physical memory is accessed. Presentation uses synchronous VDI raster
 copies clipped to current AES visible rectangles. WM_REDRAW reuses saved pixels.
+Only the union of changed client rectangles is presented after a render pass;
+WM_REDRAW still copies any requested exposed area from the authoritative backing.
+Colour conversion operates on row spans, selecting depth once per row. Opaque
+fills generate one row and copy it to the remaining rows, avoiding repeated blend
+decisions. The demo uses `-O2` rather than `-Os`, retaining `-m68060 -msoft-float`.
 All rendering and input run on the AES thread. Mouse button events retain their
 AES snapshot rather than being overwritten by a later live-state sample.
 
@@ -84,3 +89,20 @@ Requires SDL2 development headers and pkg-config. The smoke test checks renderin
 pointer tab navigation, physical text entry, no keyboard object, full viewport
 height across focus/ready/cancel, and teardown under ASan/UBSan. It does not launch
 a Linux GUI unless run without a headless option.
+
+## Scroll measurement
+
+F8 runs a synchronous diagnostic: it selects Profile, scrolls by 8-pixel steps
+from 0 to96 and back, and forces 24 rendered/presented frames. Input waits until
+the diagnostic completes. It appends elapsed, conversion and presentation times
+and pixel counts to LVBENCH.TXT in the working directory. Run with the window
+fully visible and without other interaction. The file write is outside timing.
+MiNTlib clock() uses the elapsed 200Hz clock, so timings have 5ms granularity;
+summing short strip timings is approximate. This measures forced scroll render
+throughput, not end-to-end HID latency or normal animation frame scheduling.
+
+Selecting RGB565 or XRGB8888 by depth does not by itself permit direct drawing
+into the native MFDB. The pinned LVGL renderer's BGR/BGRA byte layout differs
+from the target's big-endian RGB565 and X/R/G/B layouts. A future native renderer
+must cover fills, text masks, images, gradients and intermediate layers, with
+validation in each screen mode. No direct framebuffer access is needed.

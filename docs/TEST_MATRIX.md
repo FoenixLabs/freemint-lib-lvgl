@@ -19,7 +19,8 @@
 | Native RGB565 screen mode | Implemented; target untested |
 | NVDI runtime | Untested |
 | Resize/full-size/iconification/failure injection | Not implemented |
-| Twenty close cycles, measured latency/performance, cache stress | Not established |
+| Forced Profile scroll throughput, native32 | 24 frames:25.770s baseline →9.625s optimized; see below |
+| Twenty close cycles, HID latency, cache stress | Not established |
 
 ## Target test method
 
@@ -48,3 +49,36 @@ Repeat launch, input, cover/uncover while idle/updating, move partly offscreen,
 resize/lifecycle and failure tests in each required driver/depth. Record configured
 cache policy and run load/stress tests. The current successful native32 sample
 is not full plan acceptance. See DEMO.md for launch commands.
+
+## Scrolling performance follow-up
+
+On the same A2560Me native32 mode, F8 renders 24 Profile scroll frames (8-pixel
+steps up to96 and back) with no changes to the demo's visual effects:
+
+| Cumulative change | Total ms | Conversion ms | Presentation ms |
+|---|---:|---:|---:|
+| Original renderer plus instrumentation | 25770 | 13055 | 70 |
+| Row conversion and damage bounds | 15725 | 3090 | 50 |
+| Compile demo/LVGL with O2 | 14410 | 3060 | 45 |
+| Reuse opaque fill rows | 11660 | 3070 | 65 |
+| Increase draw strip32→100 rows | 9625 | 3070 | 65 |
+
+Every run converts5,112,000 pixels. Original presentation copied5,760,000 pixels;
+damage bounds reduce that to5,112,000. A repeat of the final build took9670ms (conversion3095ms, presentation40ms).
+Overall throughput is about2.7× baseline,
+still only about2.5 forced scroll frames/s. Conversion remains about32% of total;
+software drawing dominates the rest. A native-format renderer could remove the
+conversion pass but would not alone deliver smooth scrolling.
+
+Timings are elapsed target clock values at5ms resolution; phase accumulation is
+approximate. This is a bounded synchronous rendering test, not HID latency or
+normal animation FPS. Evidence, hashes and build logs are in the ignored system
+logs/rm10/20261029-lvgl-scroll directory. ASan/UBSan span tests cover zero/odd widths,
+unaligned buffers,16/32-bit output and untouched trailing bytes; opaque fill tests
+cover padded multirow destinations. Headless demo smoke and linked FPU scans pass.
+
+Final optimized build also passed RM10 mouse-drag scrolling, physical A2560Me
+text entry without a virtual keyboard, and desktop-dialog cover/uncover with
+typed text retained. The demo is left open on Profile. Broader scripts/check.py
+source checks passed but its baseline staging verification failed with existing
+staging mismatches; no baseline artifacts were rebuilt or replaced in this task.

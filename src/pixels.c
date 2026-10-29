@@ -36,3 +36,17 @@ void lg_pixel888_native(uint8_t *row,unsigned x,unsigned planes,uint8_t r,uint8_
     if(planes==32){row[4*x]=255;row[4*x+1]=r;row[4*x+2]=g;row[4*x+3]=b;}
     else if(planes==16){uint16_t p=((uint16_t)(r>>3)<<11)|((uint16_t)(g>>2)<<5)|(b>>3);row[2*x]=p>>8;row[2*x+1]=(uint8_t)p;}
 }
+
+/* Convert a contiguous BGR888 span. Select the format once per row, never
+ * call a converter or recompute row addresses for every colour pixel. */
+void lg_span888_native(uint8_t *dst,const uint8_t *src,unsigned count,unsigned planes){
+ unsigned i;
+ if(planes==32){
+  for(i=0;i<count;i++,src+=3,dst+=4){dst[0]=255;dst[1]=src[2];dst[2]=src[1];dst[3]=src[0];}
+ }else if(planes==16){
+  for(i=0;i<count;i++,src+=3,dst+=2){
+   unsigned p=((unsigned)(src[2]>>3)<<11)|((unsigned)(src[1]>>2)<<5)|(src[0]>>3);
+   dst[0]=p>>8;dst[1]=(uint8_t)p;
+  }
+ }
+}

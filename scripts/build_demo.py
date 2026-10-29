@@ -17,7 +17,7 @@ else:
  flags=['-m68060','-msoft-float','-isystem',str(a.mintlib.resolve()/'include')]
  if not (r/'build'/a.profile/'gemlib/.lib68020-60/libgem.a').exists():
   subprocess.run(['python3',str(r/'scripts/build_probe.py'),'--profile',a.profile,'--mintlib',str(a.mintlib)],check=True)
-flags+=['-std=gnu99','-Os','-DLV_CONF_INCLUDE_SIMPLE','-DLV_LVGL_H_INCLUDE_SIMPLE','-I'+str(r/'config/demo'),'-I'+str(source),'-I'+str(r/'include')]
+flags+=['-std=gnu99','-O2','-DLV_CONF_INCLUDE_SIMPLE','-DLV_LVGL_H_INCLUDE_SIMPLE','-I'+str(r/'config/demo'),'-I'+str(source),'-I'+str(r/'include')]
 if not a.host:flags+=['-I'+str(r/'build'/a.profile/'gemlib')]
 if a.sanitize:
  if not a.host:p.error('--sanitize requires --host')

@@ -22,6 +22,20 @@ int main(void){
   }
   assert(storage[3]==85&&storage[63]==85);
  }
+ for(size=3;size<=4;size++){
+  unsigned y;memset(storage,85,sizeof storage);memset(&d,0,sizeof d);
+  d.dest_buf=storage+1;d.dest_w=3;d.dest_h=3;d.dest_stride=17;d.opa=255;
+  d.color.red=219;d.color.green=71;d.color.blue=13;
+  assert(lg_blend_rgb_fill(&d,size)==LV_RESULT_OK);
+  for(y=0;y<3;y++){
+   for(x=0;x<3;x++){
+    uint8_t *p=storage+1+y*17+x*size;
+    assert(p[0]==13&&p[1]==71&&p[2]==219);if(size==4)assert(p[3]==255);
+   }
+   for(x=3*size;x<17;x++)assert(storage[1+y*17+x]==85);
+  }
+  assert(storage[0]==85&&storage[63]==85);
+ }
  memset(&d,0,sizeof d);d.dest_buf=storage;d.dest_w=1;d.dest_h=1;d.dest_stride=4;d.opa=255;
  d.color.red=255;assert(lg_blend_argb_opaque(&d)==LV_RESULT_OK);
  assert(storage[0]==0&&storage[1]==0&&storage[2]==255&&storage[3]==255);

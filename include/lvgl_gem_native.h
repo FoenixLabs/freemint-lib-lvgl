@@ -6,4 +6,6 @@ int lg_vdi_native_format(short handle,short report[272],unsigned *eddi_version);
 /* Pure validation: rejects unknown byte order, RGB555, indexed and packed 24. */
 int lg_vdi_report_format(const short *report,unsigned version,int fvdi,unsigned baseline_depth);
 void lg_pixel888_native(uint8_t *row,unsigned x,unsigned planes,uint8_t r,uint8_t g,uint8_t b);
+/* Non-overlapping buffers; count pixels of B,G,R to native16/32. */
+void lg_span888_native(uint8_t *dst,const uint8_t *src,unsigned count,unsigned planes);
 #endif
