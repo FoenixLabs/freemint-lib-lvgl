@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "lvgl_gem_pixels.h"
+#include "lvgl_gem_native.h"
 typedef char abi_int[(sizeof(int)==4)?1:-1];
 typedef char abi_short[(sizeof(short)==2)?1:-1];
 typedef char abi_pointer[(sizeof(void*)==4)?1:-1];
@@ -35,7 +36,7 @@ static void present(lg_rect request){
 int main(void){
  short in[11],out[57],ext[57],msg[8],x,y,w,h,cw,ch,bw,bh;
  short mx,my,buttons,keys,key,clicks,ev;int i,done=0,result=1;
- size_t stride,size;unsigned px,py;void *standard=NULL;
+ size_t stride,size;unsigned px,py,eddi;int planes;short report[272];void *standard=NULL;
  MFDB source;
  if(appl_init()<0)return 1;
  log_handle=Fcreate("LVPROBE.TXT",0);
@@ -46,23 +47,33 @@ int main(void){
  memset(ext,0,sizeof ext);vq_extnd(vhandle,1,ext);
  log_text("AES=");log_number((unsigned short)aes_global[0],16);log_text("\r\nVDI flag=1 outputs:\r\n");
  for(i=0;i<57;i++){log_number(i,10);log_text("=");log_number((unsigned short)ext[i],16);log_text("\r\n");}
- /* No trusted extension-discovery path yet: do not query EdDI speculatively. */
- if(ext[4]!=1){
-  log_text("UNSUPPORTED: Colour needs EdDI discovery and validated packed MFDB contract.\r\n");
-  form_alert(1,"[1][Probe supports mono only.|Colour needs validated EdDI/MFDB.][OK]");goto cleanup;
- }
- if(!lg_surface_size(319,193,1,&stride,&size))goto cleanup;
+ planes=lg_vdi_native_format(vhandle,report,&eddi);
+ log_text("EdDI version=");log_number(eddi,16);log_text("\r\nNative planes=");log_number(planes,10);log_text("\r\n");
+ for(i=0;i<272;i++){log_number(i,10);log_text("=");log_number((unsigned short)report[i],16);log_text("\r\n");}
+ if(!planes){form_alert(1,"[1][Unsupported VDI colour layout.][OK]");goto cleanup;}
+ if(!lg_surface_size(319,193,planes,&stride,&size))goto cleanup;
  standard=calloc(1,size);bitmap.fd_addr=calloc(1,size);
  if(!standard||!bitmap.fd_addr)goto cleanup;
- bitmap.fd_w=319;bitmap.fd_h=193;bitmap.fd_wdwidth=stride/2;bitmap.fd_nplanes=1;
+ bitmap.fd_w=319;bitmap.fd_h=193;bitmap.fd_wdwidth=(319+15)/16;bitmap.fd_nplanes=planes;
  source=bitmap;source.fd_addr=standard;source.fd_stand=1;
- for(py=0;py<193;py++)for(px=0;px<319;px++)
-  lg_pixel565((unsigned char*)standard+py*stride,px,((px/16+py/16)&1)?65535:0,1);
- vr_trnfm(vhandle,&source,&bitmap);free(standard);standard=NULL;
+ if(planes==1){
+  for(py=0;py<193;py++)for(px=0;px<319;px++)
+   lg_pixel565((unsigned char*)standard+py*stride,px,((px/16+py/16)&1)?65535:0,1);
+  vr_trnfm(vhandle,&source,&bitmap);
+ }else{
+  /* Independent owned-MFDB contract: RGB primaries, black/white and ramps. */
+  for(py=0;py<193;py++)for(px=0;px<319;px++){
+   unsigned r=0,g=0,b=0;
+   if(py<96){switch(px/64){case 0:r=255;break;case 1:g=255;break;case 2:b=255;break;case 3:r=g=b=255;break;}}
+   else {unsigned level=px*255/318;if(py<128)r=level;else if(py<160)g=level;else b=level;}
+   lg_pixel888_native((unsigned char*)bitmap.fd_addr+py*stride,px,planes,r,g,b);
+  }
+ }
+ free(standard);standard=NULL;
  wind_get(0,WF_WORKXYWH,&x,&y,&w,&h);
  win=wind_create(NAME|CLOSER|MOVER, x,y,w,h);
  if(win<0)goto cleanup;
- wind_set_str(win,WF_NAME,"LVGL GEM mono raster probe");
+ wind_set_str(win,WF_NAME,"LVGL GEM native colour raster probe");
  wind_calc(WC_BORDER,NAME|CLOSER|MOVER,0,0,319,193,&x,&y,&w,&h);
  x=32;y=48;
  if(!wind_open(win,x,y,w,h))goto cleanup;

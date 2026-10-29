@@ -42,9 +42,9 @@ library=out/'libwidgets.a'
 if library.exists():library.unlink()
 subprocess.run([ar,'rcs',str(library)]+objects,check=True)
 if a.host:
- binary=out/'lvwidgets';subprocess.run([cc]+flags+[str(r/'src/widgets_host.c'),str(r/'src/pixels.c'),str(library),'-o',str(binary)]+sdl,check=True)
+ binary=out/'lvwidgets';subprocess.run([cc]+flags+[str(r/'src/widgets_host.c'),str(r/'src/pixels.c'),str(r/'src/widgets_policy.c'),str(library),'-o',str(binary)]+sdl,check=True)
 else:
- objs=[compile_one(r/'src'/n) for n in ['gem_demo.c','widgets_main.c','pixels.c']]
+ objs=[compile_one(r/'src'/n) for n in ['gem_demo.c','widgets_main.c','widgets_policy.c','pixels.c','vdi_native.c','native_format.c']]
  lib=a.mintlib.resolve()/'build/m68020';binary=out/'LVWIDGET.APP'
  subprocess.run([cc]+flags+['-nostdlib','-Wl,--stack,128k','-Wl,-Map,'+str(out/'LVWIDGET.map'),'-o',str(binary),str(lib/'crt0.o')]+objs+[str(library),'-L'+str(r/'build'/a.profile/'gemlib/.lib68020-60'),'-L'+str(lib),'-Wl,--start-group','-lgem','-lc','-lgcc','-Wl,--end-group'],check=True)
  # Check actual compiler instructions, excluding constant bitmap/font data.

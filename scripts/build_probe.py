@@ -12,7 +12,7 @@ cc='m68k-atari-mint-gcc';mint=a.mintlib.resolve();lib=mint/'build/m68020'
 flags=['-m68060','-msoft-float','-O2','-Wall','-Wextra','-isystem',str(mint/'include')]
 subprocess.run(['make','-j4','-C',str(gem),'.lib68020-60/libgem.a','CFLAGS_68020-60=-m68060 -msoft-float','CFLAGS=-O2 -fomit-frame-pointer -I'+str(mint/'include')],check=True,stdout=(out/'gemlib-build.log').open('w'),stderr=subprocess.STDOUT)
 objects=[]
-for src in ['probe','pixels']:
+for src in ['probe','pixels','vdi_native','native_format']:
  obj=out/(src+'.o');subprocess.run([cc]+flags+['-I'+str(gem),'-I'+str(r/'include'),'-c',str(r/'src'/(src+'.c')),'-o',str(obj)],check=True);objects.append(str(obj))
 subprocess.run([cc]+flags+['-nostdlib','-Wl,--stack,64k','-Wl,-Map,'+str(out/'LVPROBE.map'),'-o',str(out/'LVPROBE.APP'),str(lib/'crt0.o')]+objects+['-L'+str(gem/'.lib68020-60'),'-L'+str(lib),'-Wl,--start-group','-lgem','-lc','-lgcc','-Wl,--end-group'],check=True)
 print(out/'LVPROBE.APP')

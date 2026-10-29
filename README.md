@@ -1,12 +1,13 @@
 # lib-lvgl — LVGL 9 for GEM
 
 Initial bring-up component for A2560Me. This repository currently supplies pinned
-LVGL/GEMlib, a software-renderer static library, a standalone monochrome GEM raster
+LVGL/GEMlib, a software-renderer static library, a standalone GEM raster
 probe, pixel/geometry primitives, host tests and a target byte diagnostic.
 It also supplies the unmodified upstream Widgets demo with a fixed-size GEM
-window adapter and a Linux/SDL colour preview. See [demo instructions](docs/DEMO.md).
+window adapter and physical-keyboard-only input. See [demo instructions](docs/DEMO.md).
 The supplied implementation plan is the roadmap; its hardware acceptance gates
-remain open. No board or emulator results are claimed.
+remain open. A2560Me FreeMiNT/fVDI 32-bit raster results are recorded in the compatibility notes;
+other drivers and modes remain open.
 
 ## Build
 
@@ -36,21 +37,21 @@ one draw unit, big endian, no OS, float or matrix support, reduced widgets.
 
 ## Run the first gate
 
-Copy LVPROBE.APP to a writable target directory and launch from GEM in a 1 bpp
-mode. It writes LVPROBE.TXT, shows a 319×193 checkerboard, and redraws saved pixels
-on exposure. Move and cover/uncover it, including while idle. Close via the closer
-or Escape. Other depths display an unsupported-mode alert. Run LVBYTES.TTP in the
-same directory and inspect LVBYTES.TXT. See docs/TEST_MATRIX.md for exact evidence.
+Copy LVPROBE.APP to a writable target directory and launch from GEM. It writes
+LVPROBE.TXT and shows 319×193 RGB bands/ramps in validated native colour formats,
+or a checkerboard at depth 1. Unknown layouts fail with an alert. Check movement
+and cover/uncover while idle. Close via the closer or Escape. Run LVWIDGET.APP
+for the upstream demo, with physical text entry and no virtual keyboard.
 
 Do not treat a cross-link, byte test, or hardware pixel specification as proof of
-NVDI raster support. Colour modes remain disabled until EdDI discovery and the
-native MFDB contract are demonstrated. The app must use AES/VDI only; never write
+NVDI raster support. Native colour requires validated EdDI channel maps; 32-bit fVDI has passed the
+independent target raster probe. The app must use AES/VDI only; never write
 framebuffer/DMA registers, enter supervisor mode, or change caches or boot flow.
 
 ## Status and next work
 
-Stages 0–2 have build/test foundations; stage 1 target validation is pending.
+Initial native 32-bit target validation is underway; full matrix acceptance remains open.
 See docs/DRIVER_COMPATIBILITY.md for blockers and docs/TEST_MATRIX.md for coverage.
 The demo now has a basic reusable fixed-size window/display/input adapter.
-Next validate its mono-to-colour VDI path on target, implement native-colour probes,
-and complete resize/lifecycle robustness and board acceptance.
+The native 32-bit raster probe now passes on A2560Me. Complete other-mode/driver tests,
+resize/lifecycle robustness and measured performance before full acceptance.

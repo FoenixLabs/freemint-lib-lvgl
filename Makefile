@@ -8,6 +8,10 @@ test:
 	mkdir -p build/host
 	cc -std=c99 -Wall -Wextra -Werror -fsanitize=address,undefined -g -Iinclude src/pixels.c tests/pixels.c -o build/host/pixels
 	build/host/pixels
+	cc -std=c99 -Wall -Wextra -Werror -fsanitize=address,undefined -g -Iinclude src/native_format.c tests/native_format.c -o build/host/native-format
+	build/host/native-format
+	cc -std=c99 -Wall -Wextra -Werror -fsanitize=address,undefined -g -DLG_HOST_PREVIEW -DLV_CONF_INCLUDE_SIMPLE -Iinclude -Iconfig/demo -Ithird_party/lvgl tests/blend.c -o build/host/blend
+	build/host/blend
 probe: verify
 	python3 scripts/build_probe.py --profile $(PROFILE) --mintlib "$(MINTLIB)"
 .PHONY: lvgl

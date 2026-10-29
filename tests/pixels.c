@@ -1,4 +1,5 @@
 #include "lvgl_gem_pixels.h"
+#include "lvgl_gem_native.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,12 @@ int main(void){
    assert(data[0]==255);
    lg_pixel888_mono(data,3,y,255,255,255);assert(data[0]==0xef);
   }
+ }
+ for(x=0;x<256;x++){
+  lg_pixel888_native(data,1,32,x,255-x,x/2);
+  assert(data[4]==255&&data[5]==x&&data[6]==255-x&&data[7]==x/2);
+  lg_pixel888_native(data,1,16,x,255-x,x/2);
+  assert((((unsigned)data[2]<<8)|data[3])==((x/8)*2048+((255-x)/4)*32+(x/2)/8));
  }
  puts("geometry, padding, mono masks and all RGB565 values passed");return 0;
 }

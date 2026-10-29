@@ -8,6 +8,7 @@
 #include "lvgl.h"
 #include "lvgl_gem_pixels.h"
 #include "demos/widgets/lv_demo_widgets.h"
+extern void lg_widgets_physical_keyboard(void);
 #define WIDTH 600
 #define HEIGHT 400
 static uint8_t frame[WIDTH*HEIGHT*3],strip[WIDTH*32*3];
@@ -21,6 +22,16 @@ static uint32_t key_value;static lv_indev_state_t key_state;
 static void read_key(lv_indev_t *in,lv_indev_data_t *data){(void)in;data->key=key_value;data->state=key_state;}
 static void send_key(lv_indev_t *keyboard,uint32_t key){key_value=key;key_state=LV_INDEV_STATE_PRESSED;lv_indev_read(keyboard);key_state=LV_INDEV_STATE_RELEASED;lv_indev_read(keyboard);}
 static void read_mouse(lv_indev_t *in,lv_indev_data_t *data){(void)in;data->point=pos;data->state=pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;}
+static lv_obj_t *find_textarea(lv_obj_t *obj){
+ uint32_t i;lv_obj_t *found;
+ if(lv_obj_check_type(obj,&lv_textarea_class))return obj;
+ for(i=0;i<lv_obj_get_child_count(obj);i++){found=find_textarea(lv_obj_get_child(obj,i));if(found)return found;}
+ return NULL;
+}
+static unsigned keyboards(lv_obj_t *obj){
+ uint32_t i;unsigned n=lv_obj_check_type(obj,&lv_keyboard_class);
+ for(i=0;i<lv_obj_get_child_count(obj);i++)n+=keyboards(lv_obj_get_child(obj,i));return n;
+}
 static void snapshot(const char *path,int mono){
  unsigned i;uint8_t bits[(WIDTH+15)/16*2*HEIGHT]={0};FILE *f=fopen(path,"wb");if(!f){perror(path);exit(1);}
  if(mono)for(i=0;i<WIDTH*HEIGHT;i++)lg_pixel888_mono(bits+(i/WIDTH)*((WIDTH+15)/16*2),i%WIDTH,i/WIDTH,frame[i*3+2],frame[i*3+1],frame[i*3]);
@@ -38,7 +49,7 @@ int main(int argc,char **argv){
  group=lv_group_create();lv_group_set_default(group);mouse=lv_indev_create();
  lv_indev_set_type(mouse,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(mouse,read_mouse);
  keyboard=lv_indev_create();lv_indev_set_type(keyboard,LV_INDEV_TYPE_KEYPAD);lv_indev_set_read_cb(keyboard,read_key);lv_indev_set_group(keyboard,group);
- lv_demo_widgets();
+ lv_demo_widgets();lg_widgets_physical_keyboard();
  if(argc==3&&(!strcmp(argv[1],"--snapshot")||!strcmp(argv[1],"--smoke-test")||!strcmp(argv[1],"--snapshot-mono"))){
   unsigned i;for(i=0;i<10;i++){lv_tick_inc(10);lv_timer_handler();}lv_refr_now(d);snapshot(argv[2],!strcmp(argv[1],"--snapshot-mono"));
   if(!strcmp(argv[1],"--smoke-test")){
@@ -50,6 +61,18 @@ int main(int argc,char **argv){
     for(i=0;i<40;i++){lv_tick_inc(10);lv_timer_handler();}
     assert(lv_tabview_get_tab_active(tabs)==tab);
    }
+   {
+    const char *s="A2560Me";lv_obj_t *ta;
+    lv_tabview_set_active(tabs,0,LV_ANIM_OFF);lv_obj_update_layout(tabs);
+    ta=find_textarea(tabs);assert(ta);assert(keyboards(lv_screen_active())==0);
+    lv_group_focus_obj(ta);lv_group_set_editing(group,true);
+    for(;*s;s++)send_key(keyboard,(unsigned char)*s);
+    assert(!strcmp(lv_textarea_get_text(ta),"A2560Me"));
+    lv_obj_send_event(ta,LV_EVENT_DEFOCUSED,NULL);lv_obj_send_event(ta,LV_EVENT_FOCUSED,NULL);
+    lv_obj_send_event(ta,LV_EVENT_READY,NULL);lv_obj_send_event(ta,LV_EVENT_CANCEL,NULL);
+    lv_obj_update_layout(tabs);assert(lv_obj_get_height(tabs)==HEIGHT);assert(keyboards(lv_screen_active())==0);
+   }
+   puts("Physical keyboard policy, text input, no virtual keyboard, unchanged viewport passed");
    puts("Upstream Widgets demo: initial render, Analytics/Shop pointer navigation and teardown passed");
   }
   lv_indev_delete(keyboard);lv_indev_delete(mouse);lv_display_delete(d);lv_group_set_default(NULL);lv_group_delete(group);lv_deinit();return 0;

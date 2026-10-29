@@ -2,42 +2,49 @@
 
 | Check | Result |
 |---|---|
-| Exact dependency SHAs and clean upstream files | Passed locally |
-| Normal-int target ABI and 20-byte MFDB assertions | Cross-compiled |
-| Mono masks, odd widths 1/7/8/15/16/17/319/641, padding | Host ASan/UBSan passed |
-| All RGB565 values to explicit 565/ARGB bytes | Host passed (replication within 1 of rounded scaling) |
-| Geometry intersection and invalid size/depth rejection | Host passed |
-| GEMlib private upstream build, 68060 soft float | Passed |
-| LVGL static library, 68060 soft float | Passed |
-| GEM raster and byte diagnostics link | Passed |
-| EmuTOS launch / mono polarity / overlap | Untested |
-| FreeMiNT/XaAES/NVDI mono/16/32 MFDBs | Untested; colour disabled |
-| Upstream Widgets demo and fixed-size GEM adapter | Cross-built; target untested |
-| Native preview rendering, pointer tab navigation, teardown | ASan/UBSan/leak check passed |
-| Bayer dither phase/endpoints and partial-byte preservation | Host passed |
-| Queue pressure, resize/failure recovery | Not implemented |
-| Full 24-bit LVGL fidelity | Not implemented |
-| Hardware caches, performance, twenty close cycles | Untested |
+| Exact dependency SHAs and clean upstream files | Passed |
+| Target ABI and MFDB assertions | Cross-compiled |
+| Geometry, odd-width mono padding/masks, all RGB565 values | Host ASan/UBSan passed |
+| Native format gate, RGB555/24/indexed/swapped rejection | Host passed |
+| Eight-bit native32 and RGB565 explicit conversion | Host passed |
+| Portable colour fills: all opacity/mask combinations, channels, padded rows | Host ASan/UBSan passed |
+| Demo rendering, pointer tabs, physical text entry, viewport, no virtual keyboard, teardown | Host ASan/UBSan/leak check passed |
+| GEMlib/LVGL/demo MiNT060 build and linked FPU inspection | Passed |
+| A2560Me FreeMiNT/fVDI 1280×1024, packed32 independent MFDB probe | Passed: primaries, black/white, channel ramps, odd width |
+| A2560Me native32 Widgets launch and colour fills | Passed visually after big-endian blend-hook correction |
+| A2560Me physical text entry, full viewport, no virtual keyboard | Passed: A2560Me entered through USB keyboard HID |
+| A2560Me final native32 Analytics navigation and colour gradient | Passed |
+| A2560Me demo move/overlap/exposure and Escape close | Passed with earlier mono-on-colour build; native32 probe closes cleanly |
+| Real depth1 EmuTOS or MiNT mode | Untested |
+| Native RGB565 screen mode | Implemented; target untested |
+| NVDI runtime | Untested |
+| Resize/full-size/iconification/failure injection | Not implemented |
+| Twenty close cycles, measured latency/performance, cache stress | Not established |
 
-## Target procedure
+## Target test method
 
-1. Record board/revision, FPGA build, OS/AES/VDI/NVDI versions, mode dimensions,
-   bit depth, and OS-managed cache policy. Hash both executables on the host.
-2. Run LVBYTES.TTP. Expected 565 pairs: f8 0, 7 e0, 0 1f, ff ff.
-   ARGB rows: ff ff 0 0; ff 0 ff 0; ff 0 0 ff; ff ff ff ff.
-   LVGL native red565 must be f8 0 on the big-endian target.
-3. In mono GEM launch LVPROBE.APP from a writable folder. Retain LVPROBE.TXT.
-   Check the 319-pixel odd-width checkerboard for wrapping and polarity.
-4. Cover/uncover while idle, move partly offscreen, top another app, close using
-   Escape and closer, and repeat twenty times. Check desktop/cursor restoration.
-5. In 16/32-bit modes confirm clean rejection; this is not colour acceptance.
-   Implement/validate EdDI and colour MFDB probe before proceeding with integration.
-6. Record pass/fail per scenario and retain captures and logs outside Git.
-   After the backend exists add widget, drag-release, focus, resize, full-size,
-   iconification, termination, allocation failure and background-load scenarios.
+Build `make probe demo MINTLIB=/absolute/path/to/built/mintlib`. Upload the two
+executables to D:/APPS/LVGL after closing old instances. Verify SHA256 by FTP
+readback. Use the RM10 skill for live HDMI screenshots and USB HID. Launch from
+TeraDesk's Open Item dialog; verify the running /kern process executable path.
+Run the independent colour probe before the Widgets demo in a new mode/driver.
+Retain LVPROBE.TXT and captures outside Git. No driver, firmware, boot configuration,
+cache setting or personal desktop setting is changed by this test.
 
-Superproject `python3 scripts/check.py` source checks passed up to its staging
-verification, which failed because existing staging differs from frozen baseline.
-This change does not modify staging or the default 58-file baseline build.
+This session established FreeMiNT 1.19 (October 17 build), 68060/no FPU, fVDI/EdDI
+1.00 and packed32 RGB8 maps. The exact FPGA/driver revision and cache policy were
+not identified. Serial capture on the established COM3/data TCP2002 endpoint was
+refused; evidence uses HDMI/HID, target /kern reports and verified file readback.
 
-See [DEMO.md](DEMO.md) for sample executable and desktop preview commands.
+Evidence is in the ignored system logs/rm10/20261029T132739Z-lvgl-widgets run.
+Earlier corrupt colour-probe and blend outputs are retained alongside successful
+retests. See DRIVER_COMPATIBILITY.md for the corrected MFDB stride and draw-blend
+issues. Early and settled screenshots are distinct: snapshot HTTP success alone
+is not a frame-freshness or latency measurement.
+
+## Remaining acceptance
+
+Repeat launch, input, cover/uncover while idle/updating, move partly offscreen,
+resize/lifecycle and failure tests in each required driver/depth. Record configured
+cache policy and run load/stress tests. The current successful native32 sample
+is not full plan acceptance. See DEMO.md for launch commands.

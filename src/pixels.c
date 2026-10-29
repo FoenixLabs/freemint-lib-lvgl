@@ -1,4 +1,5 @@
 #include "lvgl_gem_pixels.h"
+#include "lvgl_gem_native.h"
 #include <limits.h>
 int lg_intersect(lg_rect a,lg_rect b,lg_rect *o) {
     long x=a.x>b.x?a.x:b.x,y=a.y>b.y?a.y:b.y;
@@ -29,4 +30,9 @@ void lg_pixel888_mono(uint8_t *row,unsigned x,unsigned y,uint8_t r,uint8_t g,uin
     unsigned l=(77u*r+150u*g+29u*b)>>8,mask=128u>>(x&7);
     if(l<(unsigned)bayer[y&3][x&3]*16+8)row[x/8]|=mask;
     else row[x/8]&=(uint8_t)~mask;
+}
+
+void lg_pixel888_native(uint8_t *row,unsigned x,unsigned planes,uint8_t r,uint8_t g,uint8_t b){
+    if(planes==32){row[4*x]=255;row[4*x+1]=r;row[4*x+2]=g;row[4*x+3]=b;}
+    else if(planes==16){uint16_t p=((uint16_t)(r>>3)<<11)|((uint16_t)(g>>2)<<5)|(b>>3);row[2*x]=p>>8;row[2*x+1]=(uint8_t)p;}
 }

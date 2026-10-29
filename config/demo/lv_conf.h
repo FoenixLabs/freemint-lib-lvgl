@@ -66,3 +66,8 @@
 #define LV_FONT_MONTSERRAT_20 1
 #undef LV_FONT_MONTSERRAT_24
 #define LV_FONT_MONTSERRAT_24 1
+/* Portable C hooks also apply on host so both builds exercise the same path. */
+#undef LV_USE_DRAW_SW_ASM
+#define LV_USE_DRAW_SW_ASM LV_DRAW_SW_ASM_CUSTOM
+#undef LV_DRAW_SW_ASM_CUSTOM_INCLUDE
+#define LV_DRAW_SW_ASM_CUSTOM_INCLUDE "lvgl_gem_blend.h"

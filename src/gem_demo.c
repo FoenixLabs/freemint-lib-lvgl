@@ -5,10 +5,11 @@
 #include "lvgl.h"
 #include "lvgl_gem.h"
 #include "lvgl_gem_pixels.h"
+#include "lvgl_gem_native.h"
 
 typedef char abi_check[(sizeof(int)==4&&sizeof(short)==2&&sizeof(MFDB)==20)?1:-1];
 struct lg_gem {
- short app,win,vdi,opened,mouse_down;unsigned width,height;size_t stride;
+ short app,win,vdi,opened,mouse_down;unsigned planes;unsigned width,height;size_t stride;
  MFDB backing,screen;void *strip;
  lv_display_t *display;lv_indev_t *pointer,*keyboard;lv_group_t *group;
  lv_point_t pos;lv_indev_state_t pointer_state,key_state;uint32_t key;
@@ -29,7 +30,8 @@ static void flush(lv_display_t *display,const lv_area_t *a,uint8_t *pixels){
   const uint8_t *p=pixels+((y-a->y1)*w+x-a->x1)*3;
   if(x<0||y<0||x>=(int)c->width||y>=(int)c->height)continue;
   row=(uint8_t*)c->backing.fd_addr+y*c->stride;
-  lg_pixel888_mono(row,x,y,p[2],p[1],p[0]);
+  if(c->planes==1)lg_pixel888_mono(row,x,y,p[2],p[1],p[0]);
+  else lg_pixel888_native(row,x,c->planes,p[2],p[1],p[0]);
  }
  c->dirty=1;lv_display_flush_ready(display);
 }
@@ -42,7 +44,8 @@ static void present(lg_gem *c,lg_rect request){
    clip[0]=r.x;clip[1]=r.y;clip[2]=r.x+r.w-1;clip[3]=r.y+r.h-1;
    xy[0]=r.x-work.x;xy[1]=r.y-work.y;xy[2]=xy[0]+r.w-1;xy[3]=xy[1]+r.h-1;
    memcpy(xy+4,clip,sizeof clip);vs_clip(c->vdi,1,clip);v_hide_c(c->vdi);
-   vrt_cpyfm(c->vdi,MD_REPLACE,xy,&c->backing,&c->screen,colors);
+   if(c->planes==1)vrt_cpyfm(c->vdi,MD_REPLACE,xy,&c->backing,&c->screen,colors);
+   else vro_cpyfm(c->vdi,S_ONLY,xy,&c->backing,&c->screen);
    v_show_c(c->vdi,1);
   }
   wind_get(c->win,WF_NEXTXYWH,&x,&y,&w,&h);
@@ -62,20 +65,23 @@ void lg_gem_close(lg_gem *c){
 }
 lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  lg_gem *c=calloc(1,sizeof(*c));short in[11],out[57],cw,ch,bw,bh,x,y,w,h,ox,oy,ow,oh;
- size_t size;int i;
+ size_t size;int i;short report[272];unsigned eddi;
  if(!c)return NULL;
  c->app=-1;c->win=-1;
- if(!lg_surface_size(width,height,1,&c->stride,&size)){free(c);return NULL;}
+ if(!width||!height||width>4096||height>4096){free(c);return NULL;}
  c->app=appl_init();if(c->app<0){free(c);return NULL;}
  lv_init();lv_tick_set_cb(ticks);c->width=width;c->height=height;
  c->vdi=graf_handle(&cw,&ch,&bw,&bh);for(i=0;i<10;i++)in[i]=1;in[10]=2;
  v_opnvwk(in,&c->vdi,out);if(!c->vdi)goto fail;
+ c->planes=lg_vdi_native_format(c->vdi,report,&eddi);
+ if(!c->planes){form_alert(1,"[1][Unsupported VDI colour layout.|Need validated RGB565 or XRGB8888.][OK]");goto fail;}
+ if(!lg_surface_size(width,height,c->planes,&c->stride,&size))goto fail;
  wind_get(0,WF_WORKXYWH,&x,&y,&w,&h);
  wind_calc(WC_BORDER,NAME|CLOSER|MOVER,0,0,width,height,&ox,&oy,&ow,&oh);
  if(ow>w||oh>h){form_alert(1,"[1][Widgets demo needs a larger desktop.|Use at least 640 x 480.][OK]");goto fail;}
  c->backing.fd_addr=calloc(1,size);c->strip=malloc(width*32U*3U);
  if(!c->backing.fd_addr||!c->strip)goto fail;
- c->backing.fd_w=width;c->backing.fd_h=height;c->backing.fd_wdwidth=c->stride/2;c->backing.fd_nplanes=1;
+ c->backing.fd_w=width;c->backing.fd_h=height;c->backing.fd_wdwidth=(width+15)/16;c->backing.fd_nplanes=c->planes;
  c->display=lv_display_create(width,height);if(!c->display)goto fail;
  lv_display_set_user_data(c->display,c);lv_display_set_color_format(c->display,LV_COLOR_FORMAT_RGB888);
  lv_display_set_buffers(c->display,c->strip,NULL,width*32U*3U,LV_DISPLAY_RENDER_MODE_PARTIAL);
@@ -122,7 +128,10 @@ int lg_gem_step(lg_gem *c){
    else if(ascii<32||ascii>126)c->key=0; /* ASCII only */
    if(c->key){c->key_state=LV_INDEV_STATE_PRESSED;lv_indev_read(c->keyboard);c->key_state=LV_INDEV_STATE_RELEASED;lv_indev_read(c->keyboard);}
   }
-  graf_mkstate(&mx,&my,&buttons,&mod);wind_get(c->win,WF_WORKXYWH,&x,&y,&w,&h);
+  /* A button event carries its own ordered mouse snapshot. Resampling here
+   * can overwrite a short press with the already-released live state. */
+  if(!(events&MU_BUTTON))graf_mkstate(&mx,&my,&buttons,&mod);
+  wind_get(c->win,WF_WORKXYWH,&x,&y,&w,&h);
   if(c->captured||((int)mx>=x&&(int)my>=y&&(int)mx<x+(int)c->width&&(int)my<y+(int)c->height)){
    int px=mx-x,py=my-y;
    if(px<0)px=0;
