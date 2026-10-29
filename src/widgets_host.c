@@ -9,6 +9,7 @@
 #include "lvgl_gem_pixels.h"
 #include "demos/widgets/lv_demo_widgets.h"
 extern void lg_widgets_physical_keyboard(void);
+extern void lg_test_wheel(lv_display_t *display);
 #define WIDTH 600
 #define HEIGHT 400
 static uint8_t frame[WIDTH*HEIGHT*3],strip[WIDTH*32*3];
@@ -53,6 +54,7 @@ int main(int argc,char **argv){
  if(argc==3&&(!strcmp(argv[1],"--snapshot")||!strcmp(argv[1],"--smoke-test")||!strcmp(argv[1],"--snapshot-mono"))){
   unsigned i;for(i=0;i<10;i++){lv_tick_inc(10);lv_timer_handler();}lv_refr_now(d);snapshot(argv[2],!strcmp(argv[1],"--snapshot-mono"));
   if(!strcmp(argv[1],"--smoke-test")){
+   lg_test_wheel(d);
    lv_obj_t *tabs=lv_obj_get_child(lv_screen_active(),0);unsigned tab;
    assert(lv_tabview_get_tab_active(tabs)==0);
    for(tab=1;tab<=2;tab++){

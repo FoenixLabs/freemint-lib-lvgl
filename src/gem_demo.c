@@ -7,6 +7,7 @@
 #include "lvgl_gem.h"
 #include "lvgl_gem_pixels.h"
 #include "lvgl_gem_native.h"
+#include "lvgl_gem_wheel.h"
 
 typedef char abi_check[(sizeof(int)==4&&sizeof(short)==2&&sizeof(MFDB)==20)?1:-1];
 struct lg_gem {
@@ -138,6 +139,12 @@ lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  lv_indev_set_group(c->keyboard,c->group);
  c->win=wind_create(NAME|CLOSER|MOVER,x,y,w,h);if(c->win<0)goto fail;
  wind_set_str(c->win,WF_NAME,title);
+ /* XaAES WF_WHEEL takes enable, mode (the GEMlib prose omits enable).
+  * Request messages only when AES advertises this extension. */
+ {short features,b,caps,d;
+  if(appl_getinfo(AES_WINDOW,&features,&b,&caps,&d)&&(features&(1<<9)))
+   wind_set(c->win,WF_WHEEL,1,WHEEL_MESAG,0,0);
+ }
  if(!wind_open(c->win,x+(w-ow)/2,y+(h-oh)/2,ow,oh))goto fail;
  c->opened=1;c->running=1;return c;
 fail:lg_gem_close(c);return NULL;
@@ -157,6 +164,13 @@ int lg_gem_step(lg_gem *c){
    case WM_CLOSED:c->running=0;break;
    case WM_TOPPED:wind_set(c->win,WF_TOP,0,0,0,0);break;
    case WM_MOVED:wind_set(c->win,WF_CURRXYWH,msg[4],msg[5],msg[6],msg[7]);break;
+   case WM_WHEEL:{
+    int horizontal,steps;
+    wind_get(c->win,WF_WORKXYWH,&x,&y,&w,&h);
+    if(!c->captured&&lg_wheel_decode((uint16_t)msg[7],&horizontal,&steps))
+     lg_wheel_scroll(c->display,msg[4]-x,msg[5]-y,horizontal,steps);
+    break;
+   }
    case WM_REDRAW:present(c,(lg_rect){msg[4],msg[5],msg[6],msg[7]});break;
   }
  }

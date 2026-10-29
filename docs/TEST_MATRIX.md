@@ -82,3 +82,23 @@ text entry without a virtual keyboard, and desktop-dialog cover/uncover with
 typed text retained. The demo is left open on Profile. Broader scripts/check.py
 source checks passed but its baseline staging verification failed with existing
 staging mismatches; no baseline artifacts were rebuilt or replaced in this task.
+
+## Wheel events follow-up
+
+Headless ASan/UBSan tests cover WM_WHEEL direction/count decoding, hover without
+prior click, both axes, zero/invalid packets, outside points, boundaries, nested
+scroll selection and chain-disabled behavior. Existing keyboard/no-virtual-keyboard
+and upstream Widgets smoke tests also pass. Target build and FPU inspection pass.
+
+On A2560Me, AES_WINDOW reported0x7ff3 and WF_WHEEL readback confirmed enabled1,
+mode0 (WHEEL_MESAG). A small diagnostic GEM sender used appl_write to deliver a
+WM_WHEEL message to the actual LVWIDGET app/window at client coordinates inside
+Profile. Down3 moved the content96 pixels; signed up3 restored the original view. This confirms the real AES-to-LVGL
+message path, not physical wheel delivery. RM10 HID wheel attempts in both
+directions produced no visible scroll; the repository's three-byte A2560 EmuTOS
+mouse forwarding path suggests missing platform wheel transport. Firmware/input
+bridge investigation is still needed for end-to-end wheel acceptance.
+
+Evidence and diagnostic sender source are in ignored system
+logs/rm10/20261029-lvgl-wheel. Serial2002 remained refused; no service, firmware,
+boot or desktop settings changed. The demo is left running in native32 mode.

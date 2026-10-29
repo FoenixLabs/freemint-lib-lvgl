@@ -20,7 +20,12 @@ probe first in a new driver/mode and check the RGB/white/black bands and ramps.
 It writes LVPROBE.TXT in its launch directory. Then launch LVWIDGET.APP.
 The fixed work area is 600×400, requiring at least a 640×480 desktop.
 
-Use the mouse for tabs, scrolling, text-field focus and sliders. Tab/Shift-Tab
+Use the mouse for tabs, drag scrolling, text-field focus and sliders.
+On XaAES with wheel input, the wheel scrolls the container under the pointer by
+32 pixels per notch, without a prior click or changing keyboard focus. Vertical
+and horizontal WM_WHEEL orientations are supported. Movement is immediate and
+bounded; nested containers chain at their limits only when LVGL permits it.
+Wheel events outside the client or during a captured button drag are ignored. Tab/Shift-Tab
 traverse keyboard focus; Enter activates; arrows and Backspace are translated.
 Text input currently accepts ASCII. Escape or the closer exits. Drag the title
 bar to move the window. Resize/full-size/iconification remain future work.
@@ -106,3 +111,21 @@ into the native MFDB. The pinned LVGL renderer's BGR/BGRA byte layout differs
 from the target's big-endian RGB565 and X/R/G/B layouts. A future native renderer
 must cover fills, text masks, images, gradients and intermediate layers, with
 validation in each screen mode. No direct framebuffer access is needed.
+
+## AES wheel input
+
+The backend queries AES_WINDOW bit9 and enables WF_WHEEL with enable=1 and
+mode=WHEEL_MESAG, as implemented by the pinned XaAES. WM_WHEEL uses its recorded
+screen coordinates translated to client coordinates; orientation supplies the
+direction (including AES reverse-wheel policy), and the signed low-byte count is
+normalized to a magnitude. No synthetic mouse press or keyboard event is used.
+The pinned LVGL pointer enc_diff path targets the last pressed object, so it is
+unsuitable for desktop hover-wheel behavior; this backend instead hit-tests LVGL
+layers and calls bounded scroll on the nearest eligible ancestor.
+
+A2560Me test limitation: injected AES WM_WHEEL messages scroll the live demo;
+RM10 USB HID wheel commands did not scroll it. The checked-in EmuTOS A2560 mouse
+path consumes three-byte PS/2 packets and forwards only movement/buttons; it
+contains no wheel-field forwarding. This suggests a lower input-path limitation,
+not a verified physical-wheel implementation. No firmware was changed or flashed.
+Other AES implementations and physical horizontal wheel delivery remain untested.
