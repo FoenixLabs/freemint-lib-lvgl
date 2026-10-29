@@ -1,0 +1,6 @@
+[submodule "third_party/lvgl"]
+	path = third_party/lvgl
+	url = https://github.com/lvgl/lvgl.git
+[submodule "third_party/gemlib"]
+	path = third_party/gemlib
+	url = https://github.com/freemint/gemlib.git

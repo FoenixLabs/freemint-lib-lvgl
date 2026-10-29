@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-29",
+  "compiler": "m68k-atari-mint-gcc (GCC) 4.6.4 (MiNT 20130415)",
+  "binutils": "GNU ld (GNU Binutils for MiNT 20180703) 2.30",
+  "provenance": "Installed pacman package m68k-atari-mint-gcc 4.6.4-14; original download URL/archive hash unavailable. No download performed.",
+  "abi": "m68060, msoft-float, 32-bit int/pointer, 16-bit short; no mshort/fastcall",
+  "mintlib_commit": "660081d0937299e2e76f9705148019d972d8b46f",
+  "runtime_validation": "EmuTOS and FreeMiNT launch untested",
+  "sha256": {
+    "/usr/bin/m68k-atari-mint-gcc": "1f878ff84db7026162b1cbbaaee5016bb2acf98775a60dca176acd83fc9098fe",
+    "/usr/bin/m68k-atari-mint-as": "e187e2cb8f325bb2dd9537f60a0d615297b8fbfef70ddc12bdf8e9138f780814",
+    "/usr/bin/m68k-atari-mint-ld": "05ae77a6baf9737e3a6a0f5a99992d25a4c9fd4e03e918780a8cf63a83005491",
+    "components/mintlib/build/m68020/crt0.o": "f5f26405c23ad9c03c576a955a12b0efa5e283f618716ad554e70ffe38eae4a4",
+    "components/mintlib/build/m68020/libc.a": "7337194a0ba5828ca12ca9286b4f4d86c3d8a7fa5c537c404e28446aa15764f9"
+  }
+}
