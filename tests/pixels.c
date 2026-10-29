@@ -25,5 +25,18 @@ int main(void){
  assert(!lg_surface_size(10,10,24,&stride,&size));
  assert(lg_intersect((lg_rect){10,20,30,40},(lg_rect){0,0,15,25},&o));assert(o.x==10&&o.y==20&&o.w==5&&o.h==5);
  assert(!lg_intersect((lg_rect){0,0,0,1},(lg_rect){0,0,1,1},&o));
+ {
+  unsigned y;uint8_t expected[4]={0x55,0xaa,0x55,0xaa};
+  for(y=0;y<4;y++){
+   data[0]=0;
+   for(x=0;x<8;x++)lg_pixel888_mono(data,x,y,128,128,128);
+   assert(data[0]==expected[y]);
+   for(x=0;x<8;x++)lg_pixel888_mono(data,x,y,255,255,255);
+   assert(data[0]==0);
+   for(x=0;x<8;x++)lg_pixel888_mono(data,x,y,0,0,0);
+   assert(data[0]==255);
+   lg_pixel888_mono(data,3,y,255,255,255);assert(data[0]==0xef);
+  }
+ }
  puts("geometry, padding, mono masks and all RGB565 values passed");return 0;
 }

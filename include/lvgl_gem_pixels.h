@@ -9,4 +9,6 @@ int lg_surface_size(unsigned w,unsigned h,unsigned planes,size_t *stride,size_t 
 /* Convert native numeric RGB565 to explicit big-endian output bytes.
  * Mono uses MSB-first bits, with one representing black. Preserve other bits. */
 void lg_pixel565(uint8_t *row,unsigned x,uint16_t pixel,unsigned planes);
+/* Stable 4x4 ordered dither at absolute client coordinates. One means black. */
+void lg_pixel888_mono(uint8_t *row,unsigned x,unsigned y,uint8_t r,uint8_t g,uint8_t b);
 #endif

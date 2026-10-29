@@ -12,7 +12,10 @@
 | GEM raster and byte diagnostics link | Passed |
 | EmuTOS launch / mono polarity / overlap | Untested |
 | FreeMiNT/XaAES/NVDI mono/16/32 MFDBs | Untested; colour disabled |
-| Integrated LVGL display/input, queue pressure, resize/failure recovery | Not implemented |
+| Upstream Widgets demo and fixed-size GEM adapter | Cross-built; target untested |
+| Native preview rendering, pointer tab navigation, teardown | ASan/UBSan/leak check passed |
+| Bayer dither phase/endpoints and partial-byte preservation | Host passed |
+| Queue pressure, resize/failure recovery | Not implemented |
 | Full 24-bit LVGL fidelity | Not implemented |
 | Hardware caches, performance, twenty close cycles | Untested |
 
@@ -36,3 +39,5 @@
 Superproject `python3 scripts/check.py` source checks passed up to its staging
 verification, which failed because existing staging differs from frozen baseline.
 This change does not modify staging or the default 58-file baseline build.
+
+See [DEMO.md](DEMO.md) for sample executable and desktop preview commands.

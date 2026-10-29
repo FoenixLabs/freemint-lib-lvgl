@@ -18,3 +18,8 @@ bytes: lvgl
 	python3 scripts/build_bytes.py --profile $(PROFILE) --mintlib "$(MINTLIB)"
 inspect:
 	python3 scripts/inspect_binary.py build/$(PROFILE)/LVPROBE.APP build/$(PROFILE)/liblvgl.a build/$(PROFILE)/LVBYTES.TTP
+.PHONY: demo demo-host
+demo: verify
+	python3 scripts/build_demo.py --profile $(PROFILE) --mintlib "$(MINTLIB)"
+demo-host: verify
+	python3 scripts/build_demo.py --host

@@ -3,7 +3,8 @@
 Initial bring-up component for A2560Me. This repository currently supplies pinned
 LVGL/GEMlib, a software-renderer static library, a standalone monochrome GEM raster
 probe, pixel/geometry primitives, host tests and a target byte diagnostic.
-**It does not yet supply the integrated LVGL window backend or widget demo.**
+It also supplies the unmodified upstream Widgets demo with a fixed-size GEM
+window adapter and a Linux/SDL colour preview. See [demo instructions](docs/DEMO.md).
 The supplied implementation plan is the roadmap; its hardware acceptance gates
 remain open. No board or emulator results are claimed.
 
@@ -16,6 +17,7 @@ sh scripts/bootstrap.sh
 make test
 make probe bytes MINTLIB=/absolute/path/to/built/mintlib
 make inspect
+make demo MINTLIB=/absolute/path/to/built/mintlib
 ```
 
 Requires Python 3.12+, make, host C compiler with ASan/UBSan, and the recorded
@@ -49,5 +51,6 @@ framebuffer/DMA registers, enter supervisor mode, or change caches or boot flow.
 
 Stages 0–2 have build/test foundations; stage 1 target validation is pending.
 See docs/DRIVER_COMPATIBILITY.md for blockers and docs/TEST_MATRIX.md for coverage.
-Next implement validated extension discovery and colour probes, then the reusable
-LVGL display/input adapter and demo, followed by lifecycle and board acceptance.
+The demo now has a basic reusable fixed-size window/display/input adapter.
+Next validate its mono-to-colour VDI path on target, implement native-colour probes,
+and complete resize/lifecycle robustness and board acceptance.

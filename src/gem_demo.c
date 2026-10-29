@@ -1,0 +1,137 @@
+#include <gem.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include "lvgl.h"
+#include "lvgl_gem.h"
+#include "lvgl_gem_pixels.h"
+
+typedef char abi_check[(sizeof(int)==4&&sizeof(short)==2&&sizeof(MFDB)==20)?1:-1];
+struct lg_gem {
+ short app,win,vdi,opened,mouse_down;unsigned width,height;size_t stride;
+ MFDB backing,screen;void *strip;
+ lv_display_t *display;lv_indev_t *pointer,*keyboard;lv_group_t *group;
+ lv_point_t pos;lv_indev_state_t pointer_state,key_state;uint32_t key;
+ int running,dirty,captured;
+};
+static uint32_t ticks(void){return (uint32_t)clock()*(1000U/CLOCKS_PER_SEC);}
+static void pointer_read(lv_indev_t *in,lv_indev_data_t *data){
+ lg_gem *c=lv_indev_get_user_data(in);data->point=c->pos;data->state=c->pointer_state;
+}
+static void key_read(lv_indev_t *in,lv_indev_data_t *data){
+ lg_gem *c=lv_indev_get_user_data(in);data->key=c->key;data->state=c->key_state;
+}
+static void flush(lv_display_t *display,const lv_area_t *a,uint8_t *pixels){
+ lg_gem *c=lv_display_get_user_data(display);int x,y;unsigned w=lv_area_get_width(a);
+ /* RGB888 has explicit B,G,R bytes on either CPU byte order. */
+ for(y=a->y1;y<=a->y2;y++)for(x=a->x1;x<=a->x2;x++){
+  uint8_t *row;
+  const uint8_t *p=pixels+((y-a->y1)*w+x-a->x1)*3;
+  if(x<0||y<0||x>=(int)c->width||y>=(int)c->height)continue;
+  row=(uint8_t*)c->backing.fd_addr+y*c->stride;
+  lg_pixel888_mono(row,x,y,p[2],p[1],p[0]);
+ }
+ c->dirty=1;lv_display_flush_ready(display);
+}
+static void present(lg_gem *c,lg_rect request){
+ short x,y,w,h,clip[4]={0},xy[8],colors[2]={1,0};lg_rect work,r;
+ wind_get(c->win,WF_WORKXYWH,&x,&y,&w,&h);work=(lg_rect){x,y,c->width,c->height};
+ wind_update(BEG_UPDATE);wind_get(c->win,WF_FIRSTXYWH,&x,&y,&w,&h);
+ while(w>0&&h>0){
+  if(lg_intersect((lg_rect){x,y,w,h},work,&r)&&lg_intersect(r,request,&r)){
+   clip[0]=r.x;clip[1]=r.y;clip[2]=r.x+r.w-1;clip[3]=r.y+r.h-1;
+   xy[0]=r.x-work.x;xy[1]=r.y-work.y;xy[2]=xy[0]+r.w-1;xy[3]=xy[1]+r.h-1;
+   memcpy(xy+4,clip,sizeof clip);vs_clip(c->vdi,1,clip);v_hide_c(c->vdi);
+   vrt_cpyfm(c->vdi,MD_REPLACE,xy,&c->backing,&c->screen,colors);
+   v_show_c(c->vdi,1);
+  }
+  wind_get(c->win,WF_NEXTXYWH,&x,&y,&w,&h);
+ }
+ vs_clip(c->vdi,0,clip);wind_update(END_UPDATE);
+}
+void lg_gem_close(lg_gem *c){
+ if(!c)return;
+ if(c->pointer)lv_indev_delete(c->pointer);
+ if(c->keyboard)lv_indev_delete(c->keyboard);
+ if(c->display)lv_display_delete(c->display);
+ if(c->group){lv_group_set_default(NULL);lv_group_delete(c->group);}
+ if(c->win>=0){if(c->opened)wind_close(c->win);wind_delete(c->win);}
+ if(c->vdi)v_clsvwk(c->vdi);
+ free(c->strip);free(c->backing.fd_addr);
+ if(c->app>=0){lv_deinit();appl_exit();}free(c);
+}
+lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
+ lg_gem *c=calloc(1,sizeof(*c));short in[11],out[57],cw,ch,bw,bh,x,y,w,h,ox,oy,ow,oh;
+ size_t size;int i;
+ if(!c)return NULL;
+ c->app=-1;c->win=-1;
+ if(!lg_surface_size(width,height,1,&c->stride,&size)){free(c);return NULL;}
+ c->app=appl_init();if(c->app<0){free(c);return NULL;}
+ lv_init();lv_tick_set_cb(ticks);c->width=width;c->height=height;
+ c->vdi=graf_handle(&cw,&ch,&bw,&bh);for(i=0;i<10;i++)in[i]=1;in[10]=2;
+ v_opnvwk(in,&c->vdi,out);if(!c->vdi)goto fail;
+ wind_get(0,WF_WORKXYWH,&x,&y,&w,&h);
+ wind_calc(WC_BORDER,NAME|CLOSER|MOVER,0,0,width,height,&ox,&oy,&ow,&oh);
+ if(ow>w||oh>h){form_alert(1,"[1][Widgets demo needs a larger desktop.|Use at least 640 x 480.][OK]");goto fail;}
+ c->backing.fd_addr=calloc(1,size);c->strip=malloc(width*32U*3U);
+ if(!c->backing.fd_addr||!c->strip)goto fail;
+ c->backing.fd_w=width;c->backing.fd_h=height;c->backing.fd_wdwidth=c->stride/2;c->backing.fd_nplanes=1;
+ c->display=lv_display_create(width,height);if(!c->display)goto fail;
+ lv_display_set_user_data(c->display,c);lv_display_set_color_format(c->display,LV_COLOR_FORMAT_RGB888);
+ lv_display_set_buffers(c->display,c->strip,NULL,width*32U*3U,LV_DISPLAY_RENDER_MODE_PARTIAL);
+ lv_display_set_flush_cb(c->display,flush);
+ c->group=lv_group_create();if(!c->group)goto fail;lv_group_set_default(c->group);
+ c->pointer=lv_indev_create();c->keyboard=lv_indev_create();if(!c->pointer||!c->keyboard)goto fail;
+ lv_indev_set_type(c->pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_user_data(c->pointer,c);lv_indev_set_read_cb(c->pointer,pointer_read);
+ lv_indev_set_type(c->keyboard,LV_INDEV_TYPE_KEYPAD);lv_indev_set_user_data(c->keyboard,c);lv_indev_set_read_cb(c->keyboard,key_read);
+ lv_indev_set_group(c->keyboard,c->group);
+ c->win=wind_create(NAME|CLOSER|MOVER,x,y,w,h);if(c->win<0)goto fail;
+ wind_set_str(c->win,WF_NAME,title);
+ if(!wind_open(c->win,x+(w-ow)/2,y+(h-oh)/2,ow,oh))goto fail;
+ c->opened=1;c->running=1;return c;
+fail:lg_gem_close(c);return NULL;
+}
+int lg_gem_step(lg_gem *c){
+ short msg[8],mx,my,buttons,mod,key,clicks,events,x,y,w,h,top,unused;
+ uint32_t delay=lv_timer_handler();
+ if(c->dirty){present(c,(lg_rect){-32768,-32768,65535,65535});c->dirty=0;}
+ if(delay>10)delay=10;
+ if(delay<1)delay=1;
+ events=evnt_multi(MU_MESAG|MU_KEYBD|MU_TIMER|MU_BUTTON,1,1,c->mouse_down?0:1,
+  0,0,0,0,0,0,0,0,0,0,msg,delay,&mx,&my,&buttons,&mod,&key,&clicks);
+ c->mouse_down=(buttons&1)!=0;
+ if(events&MU_MESAG){
+  if(msg[0]==AP_TERM)c->running=0;
+  else if(msg[3]==c->win)switch(msg[0]){
+   case WM_CLOSED:c->running=0;break;
+   case WM_TOPPED:wind_set(c->win,WF_TOP,0,0,0,0);break;
+   case WM_MOVED:wind_set(c->win,WF_CURRXYWH,msg[4],msg[5],msg[6],msg[7]);break;
+   case WM_REDRAW:present(c,(lg_rect){msg[4],msg[5],msg[6],msg[7]});break;
+  }
+ }
+ wind_get(0,WF_TOP,&top,&unused,&unused,&unused);
+ if(!c->running)return 0;
+ if(top==c->win){
+  if(events&MU_KEYBD){
+   unsigned scan=((unsigned short)key)>>8,ascii=key&255;c->key=ascii;
+   if(ascii==27){c->running=0;return 0;}
+   if(ascii==9)c->key=(mod&3)?LV_KEY_PREV:LV_KEY_NEXT;
+   else if(ascii==13)c->key=LV_KEY_ENTER;else if(ascii==8)c->key=LV_KEY_BACKSPACE;
+   else if(scan==0x4b)c->key=LV_KEY_LEFT;else if(scan==0x4d)c->key=LV_KEY_RIGHT;
+   else if(scan==0x48)c->key=LV_KEY_UP;else if(scan==0x50)c->key=LV_KEY_DOWN;
+   else if(ascii<32||ascii>126)c->key=0; /* ASCII only */
+   if(c->key){c->key_state=LV_INDEV_STATE_PRESSED;lv_indev_read(c->keyboard);c->key_state=LV_INDEV_STATE_RELEASED;lv_indev_read(c->keyboard);}
+  }
+  graf_mkstate(&mx,&my,&buttons,&mod);wind_get(c->win,WF_WORKXYWH,&x,&y,&w,&h);
+  if(c->captured||((int)mx>=x&&(int)my>=y&&(int)mx<x+(int)c->width&&(int)my<y+(int)c->height)){
+   int px=mx-x,py=my-y;
+   if(px<0)px=0;
+   if(py<0)py=0;
+   if(px>=(int)c->width)px=c->width-1;
+   if(py>=(int)c->height)py=c->height-1;
+   c->pos.x=px;c->pos.y=py;c->pointer_state=(buttons&1)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
+   c->captured=(buttons&1)!=0;lv_indev_read(c->pointer);
+  }
+ }else if(c->captured){c->pointer_state=LV_INDEV_STATE_RELEASED;c->captured=0;lv_indev_read(c->pointer);}
+ return c->running;
+}

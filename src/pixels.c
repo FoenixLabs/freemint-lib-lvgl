@@ -23,3 +23,10 @@ void lg_pixel565(uint8_t *row,unsigned x,uint16_t p,unsigned planes) {
     else if(planes==16){row[2*x]=(uint8_t)(p>>8);row[2*x+1]=(uint8_t)p;}
     else if(planes==32){row[4*x]=255;row[4*x+1]=r;row[4*x+2]=g;row[4*x+3]=b;}
 }
+
+void lg_pixel888_mono(uint8_t *row,unsigned x,unsigned y,uint8_t r,uint8_t g,uint8_t b){
+    static const uint8_t bayer[4][4]={{0,8,2,10},{12,4,14,6},{3,11,1,9},{15,7,13,5}};
+    unsigned l=(77u*r+150u*g+29u*b)>>8,mask=128u>>(x&7);
+    if(l<(unsigned)bayer[y&3][x&3]*16+8)row[x/8]|=mask;
+    else row[x/8]&=(uint8_t)~mask;
+}

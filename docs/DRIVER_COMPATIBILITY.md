@@ -26,3 +26,11 @@ inspection and compiler assembly inspection of LVGL avoid confusing font bitmap
 bytes in a.out .text with instructions. This is an FPU check, not complete CPU
 instruction or runtime certification. Review link maps/disassembly and library
 provenance before target acceptance.
+
+## Widgets demo path
+
+The sample uses `vrt_cpyfm`, a separate documented mono-to-colour expansion call,
+instead of enabling native packed-colour MFDBs. Its one-plane source maps set/clear
+bits to VDI black/white and can run on any standard VDI desktop in principle.
+This avoids the EdDI prerequisite for the fixed-size monochrome sample only.
+The driver path still requires target launch/visual/input/overlap evidence.

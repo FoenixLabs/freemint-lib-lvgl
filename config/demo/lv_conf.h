@@ -1,0 +1,68 @@
+/* Widgets-demo overlay. Upstream files remain unmodified. */
+#include "../lv_conf.h"
+#undef LV_USE_DEMO_WIDGETS
+#define LV_USE_DEMO_WIDGETS 1
+#undef LV_MEM_SIZE
+#define LV_MEM_SIZE (1024U * 1024U)
+#ifdef LG_HOST_PREVIEW
+#undef LV_BIG_ENDIAN_SYSTEM
+#define LV_BIG_ENDIAN_SYSTEM 0
+#endif
+#undef LV_USE_ARC
+#define LV_USE_ARC 1
+#undef LV_USE_BUTTONMATRIX
+#define LV_USE_BUTTONMATRIX 1
+#undef LV_USE_CALENDAR
+#define LV_USE_CALENDAR 1
+#undef LV_USE_CANVAS
+#define LV_USE_CANVAS 1
+#undef LV_USE_CHART
+#define LV_USE_CHART 1
+#undef LV_USE_CHECKBOX
+#define LV_USE_CHECKBOX 1
+#undef LV_USE_DROPDOWN
+#define LV_USE_DROPDOWN 1
+#undef LV_USE_IMAGE
+#define LV_USE_IMAGE 1
+#undef LV_USE_IMAGEBUTTON
+#define LV_USE_IMAGEBUTTON 1
+#undef LV_USE_KEYBOARD
+#define LV_USE_KEYBOARD 1
+#undef LV_USE_LED
+#define LV_USE_LED 1
+#undef LV_USE_LINE
+#define LV_USE_LINE 1
+#undef LV_USE_MENU
+#define LV_USE_MENU 1
+#undef LV_USE_MSGBOX
+#define LV_USE_MSGBOX 1
+#undef LV_USE_ROLLER
+#define LV_USE_ROLLER 1
+#undef LV_USE_SCALE
+#define LV_USE_SCALE 1
+#undef LV_USE_SPAN
+#define LV_USE_SPAN 1
+#undef LV_USE_SPINBOX
+#define LV_USE_SPINBOX 1
+#undef LV_USE_SPINNER
+#define LV_USE_SPINNER 1
+#undef LV_USE_SWITCH
+#define LV_USE_SWITCH 1
+#undef LV_USE_TABLE
+#define LV_USE_TABLE 1
+#undef LV_USE_TABVIEW
+#define LV_USE_TABVIEW 1
+#undef LV_USE_TILEVIEW
+#define LV_USE_TILEVIEW 1
+#undef LV_USE_WIN
+#define LV_USE_WIN 1
+#undef LV_FONT_MONTSERRAT_12
+#define LV_FONT_MONTSERRAT_12 1
+#undef LV_FONT_MONTSERRAT_16
+#define LV_FONT_MONTSERRAT_16 1
+#undef LV_FONT_MONTSERRAT_18
+#define LV_FONT_MONTSERRAT_18 1
+#undef LV_FONT_MONTSERRAT_20
+#define LV_FONT_MONTSERRAT_20 1
+#undef LV_FONT_MONTSERRAT_24
+#define LV_FONT_MONTSERRAT_24 1
