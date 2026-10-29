@@ -49,3 +49,14 @@ and uniform button fills. Image/font assets remain the original upstream bytes.
 The platform wrapper removes the demo keyboard's event handlers before deleting
 its instance. Pointer focus and physical USB HID text entry preserve the full
 400-pixel client height; A2560Me entry was confirmed with no virtual keyboard.
+
+## Native32 rendering follow-up
+
+The Widgets backend now uses native FF/R/G/B rendering into its own MFDB for the
+validated packed32 contract. It preserves upstream BGR/BGRA assets/layers and
+adapts blend destinations only inside the registered native backing allocation.
+Profile-only cached scrolling reuses backing pixels, with fallback on unrelated
+invalidation or overlays. Neither optimization accesses the screen address or
+changes the driver, cache policy or framebuffer format. Headless reference
+comparisons and A2560Me F8 measurement passed; see TEST_MATRIX.md. Native16 still
+uses explicit conversion and has not been validated in a target16-bit mode.

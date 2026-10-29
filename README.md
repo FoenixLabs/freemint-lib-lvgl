@@ -52,6 +52,9 @@ framebuffer/DMA registers, enter supervisor mode, or change caches or boot flow.
 
 Initial native 32-bit target validation is underway; full matrix acceptance remains open.
 See docs/DRIVER_COMPATIBILITY.md for blockers and docs/TEST_MATRIX.md for coverage.
-The demo now has a basic reusable fixed-size window/display/input adapter.
+The demo now has a basic reusable fixed-size window/display/input adapter, native32
+rendering into its owned backing buffer and conservative Profile scroll caching.
+The A2560Me forced-scroll test improved from9.625s to2.930s for24 frames;
+see docs/DEMO.md for controls, measurements and limitations.
 The native 32-bit raster probe now passes on A2560Me. Complete other-mode/driver tests,
 resize/lifecycle robustness and measured performance before full acceptance.

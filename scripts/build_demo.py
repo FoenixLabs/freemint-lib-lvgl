@@ -24,16 +24,18 @@ if a.sanitize:
  flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
 # Configuration and tool flags are part of the cache identity.
 import hashlib
-key=hashlib.sha256((' '.join([cc]+flags)).encode()+subprocess.check_output([cc,'--version'])+(r/'dependencies.lock').read_bytes()+(r/'config/lv_conf.h').read_bytes()+(r/'config/demo/lv_conf.h').read_bytes()+b''.join(h.read_bytes() for h in sorted((r/'include').glob('*.h')))).hexdigest()
+key=hashlib.sha256((' '.join([cc]+flags)).encode()+subprocess.check_output([cc,'--version'])+Path(__file__).read_bytes()+(r/'dependencies.lock').read_bytes()+(r/'config/lv_conf.h').read_bytes()+(r/'config/demo/lv_conf.h').read_bytes()+b''.join(h.read_bytes() for h in sorted((r/'include').glob('*.h')))).hexdigest()
 stamp=out/'config.sha256';same=stamp.exists() and stamp.read_text()==key
 
 def compile_one(src):
  rel=src.relative_to(source) if src.is_relative_to(source) else Path('port')/src.name
  obj=out/rel.with_suffix('.o');obj.parent.mkdir(parents=True,exist_ok=True)
  if same and obj.exists() and (a.host or obj.with_suffix('.s').exists()) and obj.stat().st_mtime>src.stat().st_mtime:return str(obj)
- if a.host:subprocess.run([cc]+flags+['-c',str(src),'-o',str(obj)],check=True)
+ local_flags=flags[:]
+ if src.name=='lv_draw_sw_blend_to_rgb888.c':local_flags+=['-Dlv_draw_sw_blend_color_to_rgb888=lg_base_color','-Dlv_draw_sw_blend_image_to_rgb888=lg_base_image']
+ if a.host:subprocess.run([cc]+local_flags+['-c',str(src),'-o',str(obj)],check=True)
  else:
-  asm=obj.with_suffix('.s');subprocess.run([cc]+flags+['-S',str(src),'-o',str(asm)],check=True)
+  asm=obj.with_suffix('.s');subprocess.run([cc]+local_flags+['-S',str(src),'-o',str(asm)],check=True)
   subprocess.run([cc,'-m68060','-msoft-float','-c',str(asm),'-o',str(obj)],check=True)
  return str(obj)
 sources=sorted((source/'src').rglob('*.c'))+sorted((source/'demos/widgets').rglob('*.c'))
@@ -42,9 +44,9 @@ library=out/'libwidgets.a'
 if library.exists():library.unlink()
 subprocess.run([ar,'rcs',str(library)]+objects,check=True)
 if a.host:
- binary=out/'lvwidgets';subprocess.run([cc]+flags+[str(r/'src/widgets_host.c'),str(r/'src/pixels.c'),str(r/'src/widgets_policy.c'),str(r/'src/wheel.c'),str(r/'tests/wheel.c'),str(library),'-o',str(binary)]+sdl,check=True)
+ binary=out/'lvwidgets';subprocess.run([cc]+flags+[str(r/'src/widgets_host.c'),str(r/'src/pixels.c'),str(r/'src/widgets_policy.c'),str(r/'src/wheel.c'),str(r/'tests/wheel.c'),str(r/'src/render.c'),str(r/'tests/render.c'),str(r/'src/scroll_cache.c'),str(library),'-o',str(binary)]+sdl,check=True)
 else:
- objs=[compile_one(r/'src'/n) for n in ['gem_demo.c','widgets_main.c','widgets_policy.c','pixels.c','vdi_native.c','native_format.c','wheel.c']]
+ objs=[compile_one(r/'src'/n) for n in ['gem_demo.c','widgets_main.c','widgets_policy.c','pixels.c','vdi_native.c','native_format.c','wheel.c','render.c','scroll_cache.c']]
  lib=a.mintlib.resolve()/'build/m68020';binary=out/'LVWIDGET.APP'
  subprocess.run([cc]+flags+['-nostdlib','-Wl,--stack,128k','-Wl,-Map,'+str(out/'LVWIDGET.map'),'-o',str(binary),str(lib/'crt0.o')]+objs+[str(library),'-L'+str(r/'build'/a.profile/'gemlib/.lib68020-60'),'-L'+str(lib),'-Wl,--start-group','-lgem','-lc','-lgcc','-Wl,--end-group'],check=True)
  # Check actual compiler instructions, excluding constant bitmap/font data.

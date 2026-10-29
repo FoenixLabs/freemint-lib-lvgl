@@ -45,17 +45,22 @@ only with the fVDI cookie present and exact channel maps; its newer extra fields
 are not interpreted as an EdDI 1.1 promise. Cookie lookup uses MiNT Ssystem, with
 no application supervisor fallback or direct hardware access.
 
-LVGL renders into a 100-row RGB888 strip. Its explicit B,G,R bytes avoid the pinned
-version's CPU-dependent RGB565 bitfields and preserve full eight-bit colour.
-The project supplies byte-explicit C fill hooks through LVGL's custom-blender
-interface to correct the pinned version's little-endian assumptions in opacity/
-mask fills and opaque ARGB layers. No dependency sources are patched.
-Conversion writes native big-endian 565 or FF/R/G/B into the owned backing MFDB.
-32-bit output is not quantized through 565. For genuine depth 1, the existing mono
-path uses stable ordered dithering and VDI black/white expansion.
+In native32 mode LVGL now renders directly into the owned backing MFDB in
+FF/R/G/B byte order. A port adapter intercepts the two pinned RGB888 blend entry
+points; only destinations inside that backing allocation use native channels.
+Assets and intermediate layers retain upstream BGR/BGRA layout. Common fills,
+text masks and images have native paths; uncommon formats/blend modes temporarily
+reverse the clipped destination bytes and delegate to the original renderer.
+The build renames the original definitions with per-source compiler flags; it
+does not patch dependency files. There is no final pixel-conversion pass.
+
+RGB565 and real depth1 retain RGB888 rendering and explicit conversion, now with
+a full-window draw buffer. RGB565 avoids CPU-dependent bitfields; mono uses stable
+ordered dithering. Native16 drawing remains future work. The existing portable
+custom-blender hooks also keep intermediate-layer colour correct on big-endian CPUs.
 
 MFDB `fd_wdwidth` is padded pixel width divided by 16, independently of depth.
-The 600×400 native 32-bit backing is 972,800 bytes, draw strip 180,000 bytes, and the LVGL
+The 600×400 native 32-bit backing is 972,800 bytes with no separate draw strip, and the LVGL
 heap1 MiB, plus code, fonts/assets,128 KiB stack and allocation overhead. No screen
 pointer or physical memory is accessed. Presentation uses synchronous VDI raster
 copies clipped to current AES visible rectangles. WM_REDRAW reuses saved pixels.
@@ -88,12 +93,17 @@ These are headless development aids, not the A2560Me acceptance path:
 ```sh
 python3 components/lib-lvgl/scripts/build_demo.py --host --sanitize
 components/lib-lvgl/build/host-demo/lvwidgets --smoke-test /tmp/widgets.ppm
+components/lib-lvgl/build/host-demo/lvwidgets --native-smoke-test /tmp/native.ppm
+cmp /tmp/widgets.ppm /tmp/native.ppm
 ```
 
 Requires SDL2 development headers and pkg-config. The smoke test checks rendering,
 pointer tab navigation, physical text entry, no keyboard object, full viewport
 height across focus/ready/cancel, and teardown under ASan/UBSan. It does not launch
-a Linux GUI unless run without a headless option.
+a Linux GUI unless run without a headless option. The native test also compares
+all 24 cached frames with full redraws and checks invalidation/overlay fallbacks.
+Renderer tests compare opacity/masks, image formats, padded/unaligned destinations
+and guard bytes with the original renderer under ASan/UBSan.
 
 ## Scroll measurement
 
@@ -106,11 +116,34 @@ MiNTlib clock() uses the elapsed 200Hz clock, so timings have 5ms granularity;
 summing short strip timings is approximate. This measures forced scroll render
 throughput, not end-to-end HID latency or normal animation frame scheduling.
 
-Selecting RGB565 or XRGB8888 by depth does not by itself permit direct drawing
-into the native MFDB. The pinned LVGL renderer's BGR/BGRA byte layout differs
-from the target's big-endian RGB565 and X/R/G/B layouts. A future native renderer
-must cover fills, text masks, images, gradients and intermediate layers, with
-validation in each screen mode. No direct framebuffer access is needed.
+Native32 Profile scrolling reuses the unchanged pixels in that owned backing
+buffer, then renders the exposed strip and the right-hand area containing fixed
+controls. It requires a scroll-only invalidation batch, unchanged geometry and
+flat ancestors, and falls back to full drawing on other invalidation, overlays
+or unsupported geometry. This optimization is specific to the pinned Widgets
+Profile page, not a general scrolling API. Its scrollbar appearance stays constant
+to avoid restyling the entire subtree at each scroll start/end. AES exposure and
+visible-rectangle clipping still use the authoritative backing buffer.
+
+F6 toggles this cache for comparison. F7 enables optional reduced effects for the
+current run: no shadows, style transitions or animated scroll starts on existing
+objects. Restart restores the default effects. F8 also records solid-fill,
+masked-fill and image timing/pixel counts, fallback calls, cache hits and mode.
+These buckets are approximate: the 5ms clock cannot resolve every short call.
+
+A2560Me native32 measurements for 24 forced frames:
+
+| Configuration | Elapsed |
+|---|---:|
+| Previous 100-row RGB888 draw strip | 9.625–9.670s |
+| Full-window RGB888 buffer | 8.870s |
+| Native32 direct drawing | 6.760s |
+| Native32 with constant Profile scrollbar, cache disabled | 4.975s |
+| Native32 with Profile cache, default effects | 2.930s |
+| Same, optional reduced effects | 2.815s |
+
+The default improves this test about 3.3× over the previous build. It does not
+establish HID latency or animation FPS. Native16 and depth1 remain target-untested.
 
 ## AES wheel input
 

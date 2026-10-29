@@ -8,11 +8,13 @@
 #include "lvgl_gem_pixels.h"
 #include "lvgl_gem_native.h"
 #include "lvgl_gem_wheel.h"
+#include "lvgl_gem_render.h"
+#include "lvgl_gem_cache.h"
 
 typedef char abi_check[(sizeof(int)==4&&sizeof(short)==2&&sizeof(MFDB)==20)?1:-1];
 struct lg_gem {
  short app,win,vdi,opened,mouse_down;unsigned planes;unsigned width,height;size_t stride;
- MFDB backing,screen;void *strip;
+ MFDB backing,screen;void *strip;lv_draw_buf_t native_draw;int direct;lg_scroll_cache *cache;int cache_disabled,lite;
  lv_display_t *display;lv_indev_t *pointer,*keyboard;lv_group_t *group;
  lv_point_t pos;lv_indev_state_t pointer_state,key_state;uint32_t key;
  int running,dirty,captured;lg_rect damage;
@@ -30,7 +32,7 @@ static void flush(lv_display_t *display,const lv_area_t *a,uint8_t *pixels){
  lg_rect r;
  if(lg_intersect((lg_rect){a->x1,a->y1,w,lv_area_get_height(a)},
                  (lg_rect){0,0,c->width,c->height},&r)){
-  for(y=r.y;y<r.y+r.h;y++){
+  if(!c->direct)for(y=r.y;y<r.y+r.h;y++){
    uint8_t *row=(uint8_t*)c->backing.fd_addr+y*c->stride;
    const uint8_t *p=pixels+((y-a->y1)*w+r.x-a->x1)*3;
    if(c->planes==1){
@@ -47,7 +49,7 @@ static void flush(lv_display_t *display,const lv_area_t *a,uint8_t *pixels){
   }else c->damage=r;
   c->dirty=1;
  }
- if(c->measuring){c->convert_ms+=ticks()-start;c->converted_pixels+=w*lv_area_get_height(a);}
+ if(c->measuring){c->convert_ms+=ticks()-start;if(!c->direct)c->converted_pixels+=w*lv_area_get_height(a);}
  lv_display_flush_ready(display);
 }
 
@@ -80,33 +82,36 @@ static void present_damage(lg_gem *c){
  * 200 Hz elapsed clock. File I/O is outside the measured region. */
 static void benchmark(lg_gem *c){
  lv_obj_t *tabs=lv_obj_get_child(lv_screen_active(),0),*page;
- unsigned i;uint32_t start,elapsed;FILE *f;char report[256];
+ unsigned i;unsigned long cache_before;uint32_t start,elapsed;FILE *f;char report[256];
  if(!tabs||!lv_obj_check_type(tabs,&lv_tabview_class))return;
  lv_tabview_set_active(tabs,0,LV_ANIM_OFF);
  page=lv_obj_get_child(lv_tabview_get_content(tabs),0);
  lv_obj_scroll_to_y(page,0,LV_ANIM_OFF);lv_refr_now(c->display);
  present(c,(lg_rect){-32768,-32768,65535,65535});c->dirty=0;
  c->convert_ms=c->copy_ms=c->converted_pixels=c->copied_pixels=0;
- c->measuring=1;start=ticks();
+ cache_before=lg_cache_hits(c->cache);
+ c->measuring=1;lg_render_profile(1);start=ticks();
  for(i=0;i<24;i++){
   lv_obj_scroll_to_y(page,(i<12?i+1:23-i)*8,LV_ANIM_OFF);
   lv_refr_now(c->display);
   present_damage(c);
  }
- elapsed=ticks()-start;c->measuring=0;
+ elapsed=ticks()-start;c->measuring=0;lg_render_profile(0);
  f=fopen("LVBENCH.TXT","a");
  if(f){lv_snprintf(report,sizeof report,"frames=24 elapsed_ms=%lu convert_ms=%lu present_ms=%lu converted_pixels=%lu copied_pixels=%lu depth=%u\n",
-  (unsigned long)elapsed,c->convert_ms,c->copy_ms,c->converted_pixels,c->copied_pixels,c->planes);fputs(report,f);fclose(f);}
+  (unsigned long)elapsed,c->convert_ms,c->copy_ms,c->converted_pixels,c->copied_pixels,c->planes);fputs(report,f);
+  lv_snprintf(report,sizeof report,"solid_ms=%lu masked_ms=%lu image_ms=%lu fallback_calls=%lu solid_px=%lu masked_px=%lu image_px=%lu\n",lg_render_ms[0],lg_render_ms[1],lg_render_ms[2],lg_render_fallbacks,lg_render_pixels[0],lg_render_pixels[1],lg_render_pixels[2]);fputs(report,f);lv_snprintf(report,sizeof report,"cache_hits=%lu cache_enabled=%d lite=%d\n",lg_cache_hits(c->cache)-cache_before,!c->cache_disabled,c->lite);fputs(report,f);fclose(f);}
 }
 void lg_gem_close(lg_gem *c){
  if(!c)return;
+ lg_cache_delete(c->cache);
  if(c->pointer)lv_indev_delete(c->pointer);
  if(c->keyboard)lv_indev_delete(c->keyboard);
  if(c->display)lv_display_delete(c->display);
  if(c->group){lv_group_set_default(NULL);lv_group_delete(c->group);}
  if(c->win>=0){if(c->opened)wind_close(c->win);wind_delete(c->win);}
  if(c->vdi)v_clsvwk(c->vdi);
- free(c->strip);free(c->backing.fd_addr);
+ lg_render_native(NULL,0);free(c->strip);free(c->backing.fd_addr);
  if(c->app>=0){lv_deinit();appl_exit();}free(c);
 }
 lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
@@ -125,12 +130,20 @@ lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  wind_get(0,WF_WORKXYWH,&x,&y,&w,&h);
  wind_calc(WC_BORDER,NAME|CLOSER|MOVER,0,0,width,height,&ox,&oy,&ow,&oh);
  if(ow>w||oh>h){form_alert(1,"[1][Widgets demo needs a larger desktop.|Use at least 640 x 480.][OK]");goto fail;}
- c->backing.fd_addr=calloc(1,size);c->strip=malloc(width*100U*3U);
- if(!c->backing.fd_addr||!c->strip)goto fail;
+ c->direct=c->planes==32;
+ c->backing.fd_addr=calloc(1,size);if(!c->direct)c->strip=malloc(width*height*3U);
+ if(!c->backing.fd_addr||(!c->direct&&!c->strip))goto fail;
  c->backing.fd_w=width;c->backing.fd_h=height;c->backing.fd_wdwidth=(width+15)/16;c->backing.fd_nplanes=c->planes;
  c->display=lv_display_create(width,height);if(!c->display)goto fail;
- lv_display_set_user_data(c->display,c);lv_display_set_color_format(c->display,LV_COLOR_FORMAT_RGB888);
- lv_display_set_buffers(c->display,c->strip,NULL,width*100U*3U,LV_DISPLAY_RENDER_MODE_PARTIAL);
+ lv_display_set_user_data(c->display,c);
+ if(c->direct){
+  lv_display_set_color_format(c->display,LV_COLOR_FORMAT_XRGB8888);
+  if(lv_draw_buf_init(&c->native_draw,width,height,LV_COLOR_FORMAT_XRGB8888,c->stride,c->backing.fd_addr,size)!=LV_RESULT_OK)goto fail;
+  lv_display_set_draw_buffers(c->display,&c->native_draw,NULL);
+  lv_display_set_render_mode(c->display,LV_DISPLAY_RENDER_MODE_DIRECT);
+  lg_render_native(c->backing.fd_addr,size);
+ }else{lv_display_set_color_format(c->display,LV_COLOR_FORMAT_RGB888);
+ lv_display_set_buffers(c->display,c->strip,NULL,width*height*3U,LV_DISPLAY_RENDER_MODE_PARTIAL);}
  lv_display_set_flush_cb(c->display,flush);
  c->group=lv_group_create();if(!c->group)goto fail;lv_group_set_default(c->group);
  c->pointer=lv_indev_create();c->keyboard=lv_indev_create();if(!c->pointer||!c->keyboard)goto fail;
@@ -149,9 +162,14 @@ lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  c->opened=1;c->running=1;return c;
 fail:lg_gem_close(c);return NULL;
 }
+static void cache_damage(void *user,const lv_area_t *a){lg_gem *c=user;c->damage=(lg_rect){a->x1,a->y1,lv_area_get_width(a),lv_area_get_height(a)};c->dirty=1;}
 int lg_gem_step(lg_gem *c){
  short msg[8],mx,my,buttons,mod,key,clicks,events,x,y,w,h,top,unused;
- uint32_t delay=lv_timer_handler();
+ uint32_t delay;
+ if(c->direct&&!c->cache){lv_obj_t *tabs=lv_obj_get_child(lv_screen_active(),0);
+  if(tabs&&lv_obj_check_type(tabs,&lv_tabview_class))c->cache=lg_cache_create(c->display,lv_obj_get_child(lv_tabview_get_content(tabs),0),c->backing.fd_addr,c->stride,cache_damage,c);
+ }
+ delay=lv_timer_handler();
  present_damage(c);
  if(delay>10)delay=10;
  if(delay<1)delay=1;
@@ -179,6 +197,8 @@ int lg_gem_step(lg_gem *c){
  if(top==c->win){
   if(events&MU_KEYBD){
    unsigned scan=((unsigned short)key)>>8,ascii=key&255;c->key=ascii;
+   if(scan==0x41&&!c->lite){extern void lg_widgets_reduce_effects(lv_obj_t *);c->lite=1;lg_widgets_reduce_effects(lv_screen_active());return c->running;} /* F7 */
+   if(scan==0x40){c->cache_disabled=!c->cache_disabled;lg_cache_enable(c->cache,!c->cache_disabled);return c->running;} /* F6 */
    if(scan==0x42){benchmark(c);return c->running;} /* F8 */
    if(ascii==27){c->running=0;return 0;}
    if(ascii==9)c->key=(mod&3)?LV_KEY_PREV:LV_KEY_NEXT;

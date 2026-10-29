@@ -19,7 +19,7 @@
 | Native RGB565 screen mode | Implemented; target untested |
 | NVDI runtime | Untested |
 | Resize/full-size/iconification/failure injection | Not implemented |
-| Forced Profile scroll throughput, native32 | 24 frames:25.770s baseline →9.625s optimized; see below |
+| Forced Profile scroll throughput, native32 | 24 frames:25.770s original →9.625s previous →2.930s native/cache; see below |
 | Twenty close cycles, HID latency, cache stress | Not established |
 
 ## Target test method
@@ -102,3 +102,45 @@ bridge investigation is still needed for end-to-end wheel acceptance.
 Evidence and diagnostic sender source are in ignored system
 logs/rm10/20261029-lvgl-wheel. Serial2002 remained refused; no service, firmware,
 boot or desktop settings changed. The demo is left running in native32 mode.
+
+## Native rendering and Profile cache follow-up
+
+Native32 now renders FF/R/G/B directly into the owned 972,800-byte MFDB, with
+no separate draw strip and no final conversion. Original assets and intermediate
+layers retain their upstream byte layout. Host ASan/UBSan tests compare fills and
+images against the original renderer across opacities, masks, RGB888/XRGB8888/
+ARGB8888 and L8 fallback, padding, unaligned destinations and guard bytes.
+Initial native and reference smoke-test images match byte for byte. All 24 cached
+scroll frames match forced full redraws across the complete padded allocation;
+extra invalidation and a top-layer popup correctly prevent cache reuse.
+
+Target F8 results: full-window RGB888 8870ms; native32 6760ms; native32 with
+constant Profile scrollbar but cache disabled 4975ms; cache enabled 2930ms;
+optional reduced effects 2815ms. The default retains shadows and style effects,
+except Profile's scrollbar appearance stays constant to avoid full-subtree
+restyling at scroll boundaries. Cache hits were 24/24 enabled and 0/24 disabled.
+Conversion pixel count is zero. Copy volume remains5,112,000 pixels, clipped by
+AES; measured presentation was25–60ms. The conversion-time field may include a
+5ms tick of flush bookkeeping even though no pixels are converted.
+
+Default cached rendering measured solid fills380ms, masked fills210ms and
+images5ms; profiling buckets have only5ms clock resolution. Treat these as rough
+cost indicators. Optional reduced effects remains off by default because its
+additional gain was small. F6/F7/F8 controls and the cache's conservative
+Profile-only scope are described in DEMO.md. This is about3.3× the previous
+100-row version on the forced scroll test, not a measured HID frame rate.
+
+Component tests, probe cross-build, both headless smoke paths and compiler/linked
+FPU inspection passed. The 325 compiler assembly files and129 external runtime
+text ranges contained no FPU instructions. Source dependencies remain unchanged.
+Evidence and verified deployment hashes are in ignored system
+logs/rm10/20261029-lvgl-render. SerialCOM3/data TCP2002 refused; no serial capture
+was active. Native16 direct rendering and target16/mono validation remain open.
+Physical wheel investigation remains paused at the user's request.
+
+The final MiNT binary repeated2930ms with24 cache hits and default effects. RM10
+checks passed mouse-drag scrolling, physical A2560Me text entry with no virtual
+keyboard, desktop-dialog cover/uncover with text retained, and Analytics gradient
+navigation. The demo was left running on Profile. System source-contract checks
+passed; baseline staging verification still reports the existing staging
+mismatches. No baseline rebuild was performed.

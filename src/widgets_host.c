@@ -7,14 +7,21 @@
 #include <string.h>
 #include "lvgl.h"
 #include "lvgl_gem_pixels.h"
+#include "lvgl_gem_render.h"
+#include "lvgl_gem_cache.h"
+extern void lg_test_render(void);
 #include "demos/widgets/lv_demo_widgets.h"
 extern void lg_widgets_physical_keyboard(void);
 extern void lg_test_wheel(lv_display_t *display);
 #define WIDTH 600
 #define HEIGHT 400
+static int native_mode;static uint8_t native_frame[608*400*4];static lv_draw_buf_t native_draw;
 static uint8_t frame[WIDTH*HEIGHT*3],strip[WIDTH*32*3];
 static void flush(lv_display_t *d,const lv_area_t *a,uint8_t *p){
  int y;size_t width=lv_area_get_width(a);
+ if(native_mode){int x;for(y=a->y1;y<=a->y2;y++)for(x=a->x1;x<=a->x2;x++){
+  const uint8_t *s=native_frame+(y*608+x)*4;uint8_t *t=frame+(y*WIDTH+x)*3;t[0]=s[3];t[1]=s[2];t[2]=s[1];
+ }lv_display_flush_ready(d);return;}
  for(y=a->y1;y<=a->y2;y++)memcpy(frame+(y*WIDTH+a->x1)*3,p+(y-a->y1)*width*3,width*3);
  lv_display_flush_ready(d);
 }
@@ -45,15 +52,40 @@ static void snapshot(const char *path,int mono){
 int main(int argc,char **argv){
  lv_display_t *d;lv_indev_t *mouse,*keyboard;lv_group_t *group;int running=1;
  SDL_Window *window;SDL_Renderer *renderer;SDL_Texture *texture;
- lv_init();d=lv_display_create(WIDTH,HEIGHT);lv_display_set_color_format(d,LV_COLOR_FORMAT_RGB888);
+ native_mode=argc==3&&!strcmp(argv[1],"--native-smoke-test");
+ lv_init();lg_test_render();d=lv_display_create(WIDTH,HEIGHT);lv_display_set_color_format(d,LV_COLOR_FORMAT_RGB888);
  lv_display_set_buffers(d,strip,NULL,sizeof strip,LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(d,flush);
+ if(native_mode){lv_display_set_color_format(d,LV_COLOR_FORMAT_XRGB8888);lv_draw_buf_init(&native_draw,WIDTH,HEIGHT,LV_COLOR_FORMAT_XRGB8888,608*4,native_frame,sizeof native_frame);lv_display_set_draw_buffers(d,&native_draw,NULL);lv_display_set_render_mode(d,LV_DISPLAY_RENDER_MODE_DIRECT);lg_render_native(native_frame,sizeof native_frame);}
  group=lv_group_create();lv_group_set_default(group);mouse=lv_indev_create();
  lv_indev_set_type(mouse,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(mouse,read_mouse);
  keyboard=lv_indev_create();lv_indev_set_type(keyboard,LV_INDEV_TYPE_KEYPAD);lv_indev_set_read_cb(keyboard,read_key);lv_indev_set_group(keyboard,group);
  lv_demo_widgets();lg_widgets_physical_keyboard();
- if(argc==3&&(!strcmp(argv[1],"--snapshot")||!strcmp(argv[1],"--smoke-test")||!strcmp(argv[1],"--snapshot-mono"))){
+ if(argc==3&&(!strcmp(argv[1],"--snapshot")||(!strcmp(argv[1],"--smoke-test")||native_mode)||!strcmp(argv[1],"--snapshot-mono"))){
   unsigned i;for(i=0;i<10;i++){lv_tick_inc(10);lv_timer_handler();}lv_refr_now(d);snapshot(argv[2],!strcmp(argv[1],"--snapshot-mono"));
-  if(!strcmp(argv[1],"--smoke-test")){
+  if((!strcmp(argv[1],"--smoke-test")||native_mode)){
+   if(native_mode){
+    lv_obj_t *tabs=lv_obj_get_child(lv_screen_active(),0),*page=lv_obj_get_child(lv_tabview_get_content(tabs),0);
+    lg_scroll_cache *cache=lg_cache_create(d,page,native_frame,608*4,NULL,NULL);uint8_t *reference=malloc(sizeof native_frame);unsigned j;
+    assert(cache&&reference);lv_obj_invalidate(lv_screen_active());lv_refr_now(d);
+    for(j=0;j<24;j++){
+     lv_obj_scroll_to_y(page,(j<12?j+1:23-j)*8,LV_ANIM_OFF);lv_refr_now(d);
+     memcpy(reference,native_frame,sizeof native_frame);
+     lv_obj_invalidate(lv_screen_active());lv_refr_now(d);
+     assert(!memcmp(reference,native_frame,sizeof native_frame));
+    }
+    {
+     unsigned long hits=lg_cache_hits(cache);
+     lv_obj_invalidate(page);lv_obj_scroll_to_y(page,24,LV_ANIM_OFF);lv_refr_now(d);
+     assert(lg_cache_hits(cache)==hits); /* Content invalidation must prevent reuse. */
+     memcpy(reference,native_frame,sizeof native_frame);lv_obj_invalidate(lv_screen_active());lv_refr_now(d);assert(!memcmp(reference,native_frame,sizeof native_frame));
+     lv_obj_t *popup=lv_obj_create(lv_display_get_layer_top(d));lv_obj_set_size(popup,200,150);lv_refr_now(d);
+     lv_obj_scroll_to_y(page,48,LV_ANIM_OFF);lv_refr_now(d);assert(lg_cache_hits(cache)==hits);
+     memcpy(reference,native_frame,sizeof native_frame);lv_obj_invalidate(lv_screen_active());lv_obj_invalidate(popup);lv_refr_now(d);assert(!memcmp(reference,native_frame,sizeof native_frame));
+     lv_obj_delete(popup);lv_obj_scroll_to_y(page,0,LV_ANIM_OFF);lv_refr_now(d);
+    }
+    printf("Cache hits: %lu\n",lg_cache_hits(cache));assert(lg_cache_hits(cache)>0);
+    lg_cache_delete(cache);free(reference);
+   }
    lg_test_wheel(d);
    lv_obj_t *tabs=lv_obj_get_child(lv_screen_active(),0);unsigned tab;
    assert(lv_tabview_get_tab_active(tabs)==0);
