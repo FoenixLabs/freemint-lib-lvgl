@@ -9,6 +9,10 @@ The supplied implementation plan is the roadmap; its hardware acceptance gates
 remain open. A2560Me FreeMiNT/fVDI 32-bit raster results are recorded in the compatibility notes;
 other drivers and modes remain open.
 
+For application development, use [the portable helper API](docs/APPLICATIONS.md)
+and the [Hello bootstrap template](examples/hello.c). The initial backend is GEM,
+with multiple LVGL windows inside one native surface; MCP is an empty stub.
+
 ## Build
 
 ```sh

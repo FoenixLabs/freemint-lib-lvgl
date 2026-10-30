@@ -18,6 +18,7 @@ struct lg_gem {
  lv_display_t *display;lv_indev_t *pointer,*keyboard;lv_group_t *group;
  lv_point_t pos;lv_indev_state_t pointer_state,key_state;uint32_t key;
  int running,dirty,captured;lg_rect damage;
+ void (*close_request)(void *);void *close_user;
  int measuring;unsigned long convert_ms,copy_ms,converted_pixels,copied_pixels;
 };
 static uint32_t ticks(void){return (uint32_t)clock()*(1000U/CLOCKS_PER_SEC);}
@@ -78,6 +79,7 @@ static void present_damage(lg_gem *c){
  wind_get(c->win,WF_WORKXYWH,&x,&y,&w,&h);r.x+=x;r.y+=y;
  present(c,r);c->dirty=0;
 }
+#ifdef LG_WIDGETS_DEMO
 /* F8 runs a bounded, repeatable Profile scroll. Timings use MiNTlib's
  * 200 Hz elapsed clock. File I/O is outside the measured region. */
 static void benchmark(lg_gem *c){
@@ -102,6 +104,10 @@ static void benchmark(lg_gem *c){
   (unsigned long)elapsed,c->convert_ms,c->copy_ms,c->converted_pixels,c->copied_pixels,c->planes);fputs(report,f);
   lv_snprintf(report,sizeof report,"solid_ms=%lu masked_ms=%lu image_ms=%lu fallback_calls=%lu solid_px=%lu masked_px=%lu image_px=%lu\n",lg_render_ms[0],lg_render_ms[1],lg_render_ms[2],lg_render_fallbacks,lg_render_pixels[0],lg_render_pixels[1],lg_render_pixels[2]);fputs(report,f);lv_snprintf(report,sizeof report,"cache_hits=%lu cache_enabled=%d lite=%d\n",lg_cache_hits(c->cache)-cache_before,!c->cache_disabled,c->lite);fputs(report,f);fclose(f);}
 }
+#endif
+void lg_gem_on_close(lg_gem *c,void (*callback)(void *),void *user){c->close_request=callback;c->close_user=user;}
+lv_obj_t *lg_gem_root(lg_gem *c){return lv_display_get_screen_active(c->display);}
+static void request_close(lg_gem *c){if(c->close_request)c->close_request(c->close_user);}
 void lg_gem_close(lg_gem *c){
  if(!c)return;
  lg_cache_delete(c->cache);
@@ -129,7 +135,7 @@ lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  if(!lg_surface_size(width,height,c->planes,&c->stride,&size))goto fail;
  wind_get(0,WF_WORKXYWH,&x,&y,&w,&h);
  wind_calc(WC_BORDER,NAME|CLOSER|MOVER,0,0,width,height,&ox,&oy,&ow,&oh);
- if(ow>w||oh>h){form_alert(1,"[1][Widgets demo needs a larger desktop.|Use at least 640 x 480.][OK]");goto fail;}
+ if(ow>w||oh>h){form_alert(1,"[1][Application needs a larger desktop.|Use at least 640 x 480.][OK]");goto fail;}
  c->direct=c->planes==32;
  c->backing.fd_addr=calloc(1,size);if(!c->direct)c->strip=malloc(width*height*3U);
  if(!c->backing.fd_addr||(!c->direct&&!c->strip))goto fail;
@@ -162,13 +168,17 @@ lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  c->opened=1;c->running=1;return c;
 fail:lg_gem_close(c);return NULL;
 }
+#ifdef LG_WIDGETS_DEMO
 static void cache_damage(void *user,const lv_area_t *a){lg_gem *c=user;c->damage=(lg_rect){a->x1,a->y1,lv_area_get_width(a),lv_area_get_height(a)};c->dirty=1;}
+#endif
 int lg_gem_step(lg_gem *c){
  short msg[8],mx,my,buttons,mod,key,clicks,events,x,y,w,h,top,unused;
  uint32_t delay;
+ #ifdef LG_WIDGETS_DEMO
  if(c->direct&&!c->cache){lv_obj_t *tabs=lv_obj_get_child(lv_screen_active(),0);
   if(tabs&&lv_obj_check_type(tabs,&lv_tabview_class))c->cache=lg_cache_create(c->display,lv_obj_get_child(lv_tabview_get_content(tabs),0),c->backing.fd_addr,c->stride,cache_damage,c);
  }
+ #endif
  delay=lv_timer_handler();
  present_damage(c);
  if(delay>10)delay=10;
@@ -177,9 +187,9 @@ int lg_gem_step(lg_gem *c){
   0,0,0,0,0,0,0,0,0,0,msg,delay,&mx,&my,&buttons,&mod,&key,&clicks);
  c->mouse_down=(buttons&1)!=0;
  if(events&MU_MESAG){
-  if(msg[0]==AP_TERM)c->running=0;
+  if(msg[0]==AP_TERM)request_close(c);
   else if(msg[3]==c->win)switch(msg[0]){
-   case WM_CLOSED:c->running=0;break;
+   case WM_CLOSED:request_close(c);break;
    case WM_TOPPED:wind_set(c->win,WF_TOP,0,0,0,0);break;
    case WM_MOVED:wind_set(c->win,WF_CURRXYWH,msg[4],msg[5],msg[6],msg[7]);break;
    case WM_WHEEL:{
@@ -197,11 +207,13 @@ int lg_gem_step(lg_gem *c){
  if(top==c->win){
   if(events&MU_KEYBD){
    unsigned scan=((unsigned short)key)>>8,ascii=key&255;c->key=ascii;
+   #ifdef LG_WIDGETS_DEMO
    if(scan==0x41&&!c->lite){extern void lg_widgets_reduce_effects(lv_obj_t *);c->lite=1;lg_widgets_reduce_effects(lv_screen_active());return c->running;} /* F7 */
    if(scan==0x40){c->cache_disabled=!c->cache_disabled;lg_cache_enable(c->cache,!c->cache_disabled);return c->running;} /* F6 */
    if(scan==0x42){benchmark(c);return c->running;} /* F8 */
-   if(ascii==27){c->running=0;return 0;}
-   if(ascii==9)c->key=(mod&3)?LV_KEY_PREV:LV_KEY_NEXT;
+   #endif
+   if(ascii==27)c->key=LV_KEY_ESC;
+   else if(ascii==9)c->key=(mod&3)?LV_KEY_PREV:LV_KEY_NEXT;
    else if(ascii==13)c->key=LV_KEY_ENTER;else if(ascii==8)c->key=LV_KEY_BACKSPACE;
    else if(scan==0x4b)c->key=LV_KEY_LEFT;else if(scan==0x4d)c->key=LV_KEY_RIGHT;
    else if(scan==0x48)c->key=LV_KEY_UP;else if(scan==0x50)c->key=LV_KEY_DOWN;

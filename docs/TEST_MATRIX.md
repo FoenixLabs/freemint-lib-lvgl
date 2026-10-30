@@ -144,3 +144,36 @@ keyboard, desktop-dialog cover/uncover with text retained, and Analytics gradien
 navigation. The demo was left running on Profile. System source-contract checks
 passed; baseline staging verification still reports the existing staging
 mismatches. No baseline rebuild was performed.
+
+## Application helper and platform abstraction
+
+The `lvgl_app.h` API now owns initialization, the default surface, multiple LVGL
+windows and the event loop. GEM is implemented; MCP is an empty backend that
+returns a clear initialization error without accessing hardware. There is no
+NetBSD/wsdisplay application backend yet. See APPLICATIONS.md and examples/.
+
+ASan/UBSan API tests passed initialization failure/retry, singleton rejection,
+window geometry, active-window routing from child widgets, unhandled/refused and
+recursive close requests, callback destruction, direct LVGL object deletion,
+last-window survival, explicit quit and cleanup/reinitialization. MCP stub tests
+passed. Existing native-render/cache/keyboard Widgets smoke checks also passed.
+`make test`, `make probe`, and the examples/demo cross-build/FPU scans passed.
+
+A2560Me RM10 checks established that Escape leaves LVWIN running; a native closer
+request destroys only the active Tools window, and a subsequent Main close
+callback explicitly quits. Final-build checks passed title-bar dragging and the
+LVGL Tools closer without exiting Main, then Main's LVGL closer exited through
+lg_app_quit. Executables were verified by FTP SHA256 readback; /kern process paths
+identified the launched applications. Evidence is in ignored system
+logs/rm10/20261029-lvgl-app (local October29, UTC October30).
+
+COM3/data TCP2002 still refused connections, so no serial capture was available.
+System source-contract checks passed; existing baseline staging mismatches remain.
+No firmware, driver, boot or cache configuration changed. Runtime native16/mono,
+forced OS termination, modal/resize policy and long-duration multiwindow stress
+remain unverified or outside this first API implementation.
+
+The final Hello bootstrap also launched correctly and remained open after Escape;
+/kern/56/fname confirmed LVHELLO.APP. It is left running on the target. The migrated
+Widgets entry point cross-built and passed host rendering checks; its new close
+callback was not separately exercised on hardware in this run.

@@ -27,3 +27,12 @@ demo: verify
 	python3 scripts/build_demo.py --profile $(PROFILE) --mintlib "$(MINTLIB)"
 demo-host: verify
 	python3 scripts/build_demo.py --host
+
+.PHONY: examples app-test
+examples: verify
+	python3 scripts/build_demo.py --example hello --profile $(PROFILE) --mintlib "$(MINTLIB)"
+	python3 scripts/build_demo.py --example windows --profile $(PROFILE) --mintlib "$(MINTLIB)"
+app-test: verify
+	python3 scripts/build_demo.py --host --sanitize
+	build/host-demo/test-app
+	build/host-demo/test-mcp

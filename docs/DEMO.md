@@ -27,7 +27,8 @@ and horizontal WM_WHEEL orientations are supported. Movement is immediate and
 bounded; nested containers chain at their limits only when LVGL permits it.
 Wheel events outside the client or during a captured button drag are ignored. Tab/Shift-Tab
 traverse keyboard focus; Enter activates; arrows and Backspace are translated.
-Text input currently accepts ASCII. Escape or the closer exits. Drag the title
+Text input currently accepts ASCII. The native closer requests exit through the demo's explicit application callback.
+Escape is passed to LVGL and does not exit. Drag the title
 bar to move the window. Resize/full-size/iconification remain future work.
 The virtual keyboard never appears when focusing a text field; focus also keeps
 the full window height available. The unused keyboard widget support is compiled
@@ -162,3 +163,6 @@ path consumes three-byte PS/2 packets and forwards only movement/buttons; it
 contains no wheel-field forwarding. This suggests a lower input-path limitation,
 not a verified physical-wheel implementation. No firmware was changed or flashed.
 Other AES implementations and physical horizontal wheel delivery remain untested.
+
+The GEM entry point now uses `lvgl_app.h` for initialization and the event loop.
+See APPLICATIONS.md for independent application templates and multiple LVGL windows.
