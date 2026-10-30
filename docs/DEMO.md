@@ -165,4 +165,4 @@ not a verified physical-wheel implementation. No firmware was changed or flashed
 Other AES implementations and physical horizontal wheel delivery remain untested.
 
 The GEM entry point now uses `lvgl_app.h` for initialization and the event loop.
-See APPLICATIONS.md for independent application templates and multiple LVGL windows.
+See APPLICATIONS.md for the single native-window application template.

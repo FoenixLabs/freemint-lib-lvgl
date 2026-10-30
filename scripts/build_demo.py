@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse,subprocess,concurrent.futures,shlex
 p=argparse.ArgumentParser(description=__doc__)
-p.add_argument('--example',choices=['widgets','hello','windows'],default='widgets')
+p.add_argument('--example',choices=['widgets','hello'],default='widgets')
 p.add_argument('--platform',choices=['gem','mcp'],default='gem')
 p.add_argument('--sanitize',action='store_true',help='ASan/UBSan for host preview')
 p.add_argument('--mintlib',type=Path);p.add_argument('--host',action='store_true')
@@ -63,7 +63,7 @@ else:
  subprocess.run([ar,'rcs',str(app_library)]+objs,check=True)
  main=r/'src/widgets_main.c' if a.example=='widgets' else r/'examples'/(a.example+'.c')
  objs=[compile_one(main),str(app_library)]
- lib=a.mintlib.resolve()/'build/m68020';name={'widgets':'LVWIDGET','hello':'LVHELLO','windows':'LVWIN'}[a.example];binary=out/(name+'.APP')
+ lib=a.mintlib.resolve()/'build/m68020';name={'widgets':'LVWIDGET','hello':'LVHELLO'}[a.example];binary=out/(name+'.APP')
  subprocess.run([cc]+flags+['-nostdlib','-Wl,--stack,128k','-Wl,-Map,'+str(out/(name+'.map')),'-o',str(binary),str(lib/'crt0.o')]+objs+[str(library),'-L'+str(r/'build'/a.profile/'gemlib/.lib68020-60'),'-L'+str(lib),'-Wl,--start-group','-lgem','-lc','-lgcc','-Wl,--end-group'],check=True)
  # Check actual compiler instructions, excluding constant bitmap/font data.
  import re

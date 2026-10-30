@@ -11,7 +11,7 @@ other drivers and modes remain open.
 
 For application development, use [the portable helper API](docs/APPLICATIONS.md)
 and the [Hello bootstrap template](examples/hello.c). The initial backend is GEM,
-with multiple LVGL windows inside one native surface; MCP is an empty stub.
+with a single native window/surface and no LVGL window decorations; MCP is an empty stub.
 
 ## Build
 

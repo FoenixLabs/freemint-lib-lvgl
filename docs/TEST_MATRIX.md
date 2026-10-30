@@ -145,7 +145,7 @@ navigation. The demo was left running on Profile. System source-contract checks
 passed; baseline staging verification still reports the existing staging
 mismatches. No baseline rebuild was performed.
 
-## Application helper and platform abstraction
+## Application helper and platform abstraction (historical multiwindow experiment)
 
 The `lvgl_app.h` API now owns initialization, the default surface, multiple LVGL
 windows and the event loop. GEM is implemented; MCP is an empty backend that
@@ -177,3 +177,25 @@ The final Hello bootstrap also launched correctly and remained open after Escape
 /kern/56/fname confirmed LVHELLO.APP. It is left running on the target. The migrated
 Widgets entry point cross-built and passed host rendering checks; its new close
 callback was not separately exercised on hardware in this run.
+
+
+## Single native surface revision
+
+The multiwindow experiment above is superseded. The helper now exposes only one
+native GEM window/client surface per application. Content attaches directly to
+lg_app_root(), and LV_USE_WIN is disabled. The lg_window_* API and windows.c
+example are removed. Simplified init/run and callback-controlled shutdown remain;
+MCP is still an empty stub. See APPLICATIONS.md for the current API.
+
+Host ASan/UBSan tests passed direct-root/no-extra-objects, surface dimensions,
+initialization failure/retry, singleton rejection, unhandled/refused/reentrant
+close requests, explicit quit and cleanup. MCP failure-path tests and native
+Widgets renderer/cache smoke passed. make test/probe and both target builds/FPU
+scans passed. Symbol checks found no lv_win_* or lg_window_* in either executable.
+
+On A2560Me, the updated Hello template showed only the native GEM frame and a
+label centered in the full client area. Escape kept it open; the native closer
+invoked its explicit quit callback and removed the process. It was relaunched
+and left running. FTP SHA256 readback and /kern/59/fname confirmed the deployed
+LVHELLO.APP. Evidence is in ignored logs/rm10/20261029-lvgl-single. Widgets was
+cross-built/deployed and host-tested, not relaunched during this revision.
