@@ -62,3 +62,12 @@ The A2560Me forced-scroll test improved from9.625s to2.930s for24 frames;
 see docs/DEMO.md for controls, measurements and limitations.
 The native 32-bit raster probe now passes on A2560Me. Complete other-mode/driver tests,
 resize/lifecycle robustness and measured performance before full acceptance.
+
+External applications can build the helper and LVGL archives with
+`python3 scripts/build_demo.py --library-only --mintlib /path/to/mintlib
+--config /path/to/app/config --output /path/to/app/build/library` (one command).
+The config directory must contain `lv_conf.h`. Compile application sources with
+that same configuration, then link `liblvgl-app.a` and `libwidgets.a`, GEMlib,
+and MiNTlib. `--host --library-only` builds only the LVGL archive for headless
+unit tests, without SDL or a preview window. App-specific codecs and memory
+settings are included in the build cache identity.
