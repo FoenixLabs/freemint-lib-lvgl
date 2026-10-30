@@ -3,6 +3,8 @@
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
+#include <unistd.h>
+
 #include "lvgl.h"
 #include "lvgl_gem.h"
 #include "lvgl_gem_pixels.h"
@@ -10,6 +12,7 @@
 #include "lvgl_gem_wheel.h"
 #include "lvgl_gem_render.h"
 #include "lvgl_gem_cache.h"
+#include "gem_menu.h"
 
 typedef char abi_check[(sizeof(int)==4&&sizeof(short)==2&&sizeof(MFDB)==20)?1:-1];
 struct lg_gem {
@@ -18,6 +21,7 @@ struct lg_gem {
  lv_display_t *display;lv_indev_t *pointer,*keyboard;lv_group_t *group;
  lv_point_t pos;lv_indev_state_t pointer_state,key_state;uint32_t key;
  int running,dirty,captured;lg_rect damage;
+ lg_gem_menu *menu;void (*menu_selected)(void *,int);void *menu_user;
  void (*close_request)(void *);void *close_user;
  int measuring;unsigned long convert_ms,copy_ms,converted_pixels,copied_pixels;
 };
@@ -108,8 +112,38 @@ static void benchmark(lg_gem *c){
 void lg_gem_on_close(lg_gem *c,void (*callback)(void *),void *user){c->close_request=callback;c->close_user=user;}
 lv_obj_t *lg_gem_root(lg_gem *c){return lv_display_get_screen_active(c->display);}
 static void request_close(lg_gem *c){if(c->close_request)c->close_request(c->close_user);}
+int lg_gem_set_menu(lg_gem *c,const lg_menu_model *model,void (*selected)(void *,int),void *user){
+ short cw,ch,bw,bh,out[57];lg_gem_menu *m;lg_menu_model named=*model;
+ char path[1024],proc[64];FILE *f;extern char *program_invocation_name;
+ lv_snprintf(proc,sizeof proc,"U:/kern/%ld/fname",(long)getpid());
+ f=fopen(proc,"r");
+ if(f){if(!fgets(path,sizeof path,f))path[0]=0;fclose(f);}else path[0]=0;
+ lg_gem_menu_name(named.menu_title,path[0]?path:program_invocation_name);model=&named;
+ if(c->menu)return 0;
+ m=calloc(1,sizeof *m);if(!m)return 0;
+ graf_handle(&cw,&ch,&bw,&bh);vq_extnd(c->vdi,0,out);
+ if(!lg_gem_menu_build(m,model,cw,ch,out[0]+1,out[1]+1)||!menu_bar(m->tree,1)){free(m);return 0;}
+ m->installed=1;c->menu=m;c->menu_selected=selected;c->menu_user=user;
+ /* MultiTOS/XaAES registration makes the real app title appear in Desk. */
+ if(aes_global[0]>=0x0400)menu_register(c->app,m->registered_name);
+ return 1;
+}
+static void menu_event(lg_gem *c,short title,short item){
+ lg_gem_menu *m=c->menu;int id;
+ if(!m||title<0||title>=m->count||m->tree[title].ob_type!=G_TITLE)return;
+ menu_tnormal(m->tree,title,1);
+ if(item<0||item>=m->count||m->title_id[item]!=title||m->tree[item].ob_state&OS_DISABLED)return;
+ id=m->item_id[item];
+ if(id&&c->menu_selected)c->menu_selected(c->menu_user,id);
+ else if(!id){char alert[LG_MENU_TEXT+32];unsigned i;
+  strcpy(alert,"[1][");strcat(alert,m->registered_name+2);
+  for(i=4;alert[i];i++)if(alert[i]=='['||alert[i]==']'||alert[i]=='|')alert[i]=' ';
+  strcat(alert,"][OK]");form_alert(1,alert);
+ }
+}
 void lg_gem_close(lg_gem *c){
  if(!c)return;
+ if(c->menu&&c->menu->installed)menu_bar(c->menu->tree,0);
  lg_cache_delete(c->cache);
  if(c->pointer)lv_indev_delete(c->pointer);
  if(c->keyboard)lv_indev_delete(c->keyboard);
@@ -118,7 +152,7 @@ void lg_gem_close(lg_gem *c){
  if(c->win>=0){if(c->opened)wind_close(c->win);wind_delete(c->win);}
  if(c->vdi)v_clsvwk(c->vdi);
  lg_render_native(NULL,0);free(c->strip);free(c->backing.fd_addr);
- if(c->app>=0){lv_deinit();appl_exit();}free(c);
+ if(c->app>=0){lv_deinit();appl_exit();}free(c->menu);free(c);
 }
 lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title,int resizable){
  lg_gem *c=calloc(1,sizeof(*c));short in[11],out[57],cw,ch,bw,bh,x,y,w,h,ox,oy,ow,oh;
@@ -229,8 +263,10 @@ int lg_gem_step(lg_gem *c){
  events=evnt_multi(MU_MESAG|MU_KEYBD|MU_TIMER|MU_BUTTON,1,1,c->mouse_down?0:1,
   0,0,0,0,0,0,0,0,0,0,msg,delay,&mx,&my,&buttons,&mod,&key,&clicks);
  c->mouse_down=(buttons&1)!=0;
+
  if(events&MU_MESAG){
-  if(msg[0]==AP_TERM)request_close(c);
+  if(msg[0]==MN_SELECTED)menu_event(c,msg[3],msg[4]);
+  else if(msg[0]==AP_TERM)request_close(c);
   else if(msg[3]==c->win)switch(msg[0]){
    case WM_CLOSED:request_close(c);break;
    case WM_SIZED:resize_window(c,msg[4],msg[5],msg[6],msg[7]);break;

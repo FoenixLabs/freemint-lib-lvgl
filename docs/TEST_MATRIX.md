@@ -226,3 +226,32 @@ restored640x480 and the centered label without stale scroll/draw artifacts.
 The resizable Hello sample is left running. Full-size/maximize and iconification
 remain outside this change. The fixed Widgets build was deployed but not launched
 in this run; its renderer/cache smoke test ran headlessly.
+
+## Native AES menu bar (2026-10-29)
+
+The helper installs an owned AES tree on first run. The first title is the
+executable basename without spaces or extension; the native dropdown retains the
+application/About entry and AES task list. File → Quit is supplied by default.
+Applications can add menus, callback items and separators before run, and replace
+callbacks while running. MCP still fails initialization without hardware access.
+
+Component pixel/native-format/blend tests, probe, ASan/UBSan application/MCP tests,
+and the new AES-tree tests passed. Tree tests cover sibling/parent links, item
+mapping, executable-name normalization, maximum counts, empty menus and screen
+bounds. Both MiNT binaries passed instruction-level FPU scans. Private headers
+are now included in the build-cache identity to prevent stale backend layouts.
+
+RM10 testing on A2560Me/XaAES 1.7.0 Beta, native32 at1280x1024 confirmed LVHELLO
+as the first menu title, Hello LVGL in the dropdown/task list, Actions → Greet
+updating the label, and File → Quit removing the process and restoring TeraDesk's
+menu. The About alert also worked during bring-up. The final clean LVHELLO SHA256
+was79e6ebbcfe0e4e4a93a782bbdca185081852dd800a12158ed6e00f01eb4576ff;
+FTP readback and /kern/89/fname confirmed deployment and process identity.
+Evidence is in ignored logs/rm10/20261029-lvgl-menu. Large isolated KVM pointer
+jumps initially failed to activate items; smaller successive movements inside
+the dropdown activated them consistently. No AES hit-testing workaround was added.
+
+The final Widgets binary was cross-built and deployed, not launched in this run.
+Native16/mono and other AES implementations remain untested for menus. The target
+was left at the desktop after Quit. The system source checks passed up to the
+existing baseline staging mismatch; full scripts/check.py did not pass that gate.

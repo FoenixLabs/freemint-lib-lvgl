@@ -24,6 +24,15 @@ lv_obj_t *lg_app_root(lg_app_t *app);
  * Escape does not quit. Use the helper below or call lg_app_quit explicitly. */
 void lg_app_on_close(lg_app_t *app, lg_app_close_fn callback, void *user);
 void lg_app_quit_callback(lg_app_t *app, void *unused);
+/* Configure menus before run. IDs >0 indicate success; 0 indicates failure.
+ * Labels are copied, 1..63 bytes. File and Quit are supplied automatically. */
+enum { LG_MENU_FILE = 1, LG_MENU_QUIT = 1 };
+int lg_menu_add(lg_app_t *app, const char *title);
+int lg_menu_add_item(lg_app_t *app, int menu, const char *label,
+                     lg_app_close_fn callback, void *user);
+int lg_menu_add_separator(lg_app_t *app, int menu);
+/* May also replace the default Quit callback; callable while running. */
+int lg_menu_on_item(lg_app_t *app, int item, lg_app_close_fn callback, void *user);
 #ifdef __cplusplus
 }
 #endif

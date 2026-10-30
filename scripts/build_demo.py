@@ -27,7 +27,7 @@ if a.sanitize:
  flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
 # Configuration and tool flags are part of the cache identity.
 import hashlib
-key=hashlib.sha256((' '.join([cc]+flags)).encode()+subprocess.check_output([cc,'--version'])+Path(__file__).read_bytes()+(r/'dependencies.lock').read_bytes()+(r/'config/lv_conf.h').read_bytes()+(r/'config/demo/lv_conf.h').read_bytes()+b''.join(h.read_bytes() for h in sorted((r/'include').glob('*.h')))).hexdigest()
+key=hashlib.sha256((' '.join([cc]+flags)).encode()+subprocess.check_output([cc,'--version'])+Path(__file__).read_bytes()+(r/'dependencies.lock').read_bytes()+(r/'config/lv_conf.h').read_bytes()+(r/'config/demo/lv_conf.h').read_bytes()+b''.join(h.read_bytes() for h in sorted(list((r/'include').glob('*.h'))+list((r/'src').glob('*.h'))))).hexdigest()
 stamp=out/'config.sha256';same=stamp.exists() and stamp.read_text()==key
 
 def compile_one(src):
@@ -55,7 +55,7 @@ if a.host:
   subprocess.run([cc]+flags+[str(s) for s in test_sources]+[str(library),'-o',str(out/('test-'+test))],check=True)
 else:
  port=['app.c','platform_'+a.platform+'.c','render.c']
- if a.platform=='gem':port+=['gem_demo.c','pixels.c','vdi_native.c','native_format.c','wheel.c','scroll_cache.c']
+ if a.platform=='gem':port+=['gem_demo.c','gem_menu.c','pixels.c','vdi_native.c','native_format.c','wheel.c','scroll_cache.c']
  if a.example=='widgets':port+=['widgets_policy.c']
  objs=[compile_one(r/'src'/n) for n in port]
  app_library=out/'liblvgl-app.a'

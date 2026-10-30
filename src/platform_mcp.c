@@ -8,3 +8,5 @@ void lg_platform_step(void *platform){(void)platform;}
 lv_obj_t *lg_platform_root(void *platform){(void)platform;return NULL;}
 void lg_platform_close(void *platform){(void)platform;}
 const char *lg_platform_error(void){return "MCP backend is not implemented";}
+
+int lg_platform_menu(void *p,const lg_menu_model *m,void (*selected)(void *,int),void *user){(void)p;(void)m;(void)selected;(void)user;return 0;}

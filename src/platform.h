@@ -1,6 +1,7 @@
 #ifndef LG_PLATFORM_H
 #define LG_PLATFORM_H
 #include "lvgl.h"
+#include "menu_model.h"
 /* Private backend contract. open owns LVGL, display, inputs and clock setup;
  * failure must unwind everything. step pumps one bounded iteration, including
  * timers/presentation, and may invoke close_request. It never decides to quit.
@@ -9,6 +10,7 @@
  * requests native resizing when supported; a full-screen backend may ignore it. */
 void *lg_platform_open(const char *title, unsigned width, unsigned height, int resizable,
                        void (*close_request)(void *), void *user);
+int lg_platform_menu(void *platform,const lg_menu_model *menu,void (*selected)(void *,int),void *user);
 void lg_platform_step(void *platform);
 lv_obj_t *lg_platform_root(void *platform);
 void lg_platform_close(void *platform);

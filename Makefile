@@ -35,3 +35,9 @@ app-test: verify
 	python3 scripts/build_demo.py --host --sanitize
 	build/host-demo/test-app
 	build/host-demo/test-mcp
+
+.PHONY: menu-test
+menu-test: probe
+	mkdir -p build/host
+	cc -std=gnu99 -Wall -Wextra -Werror -fsanitize=address,undefined -g -DLG_HOST_PREVIEW -DLV_CONF_INCLUDE_SIMPLE -Iinclude -Iconfig/demo -Ithird_party/lvgl -Itests/host -Ibuild/$(PROFILE)/gemlib src/gem_menu.c tests/menu_tree.c -o build/host/menu-tree
+	build/host/menu-tree

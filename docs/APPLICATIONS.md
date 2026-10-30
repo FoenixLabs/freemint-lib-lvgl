@@ -90,6 +90,54 @@ available through `lg_app_error()`.
 F6/F7/F8 remain Widgets-demo controls only. Ordinary applications do not inherit
 its Profile cache, benchmark or reduced-effects shortcuts.
 
+## Native AES menus
+
+`lg_app_run()` installs a native AES menu bar. Its first title uses the executable
+basename without spaces or its extension (`LVHELLO.APP` becomes `LVHELLO`).
+The GEM backend reads MiNT’s process filename, falling back to the C runtime
+invocation name and finally `LVGL` when no executable identity is available.
+The dropdown contains the application name and a simple About alert; on
+MultiTOS/XaAES the application also registers that name in the task list. File contains Quit, whose default callback calls
+`lg_app_quit()`. This is independent of the native window close callback.
+
+Add menus and items after initialization and before the first event loop:
+
+```c
+static void clear(lg_app_t *app, void *label)
+{
+    (void)app;
+    lv_label_set_text(label, "");
+}
+
+/* After creating app and label: */
+int edit = lg_menu_add(app, "Edit");
+int clear_item = lg_menu_add_item(app, edit, "Clear", clear, label);
+if (!edit || !clear_item) { /* inspect lg_app_error(), clean up, return */ }
+```
+
+Use `LG_MENU_FILE` to add items to File and `lg_menu_add_separator(app, menu)`
+for a disabled separator. Menu IDs and item IDs are separate namespaces;
+positive IDs indicate success, zero indicates failure. Labels are copied and
+must contain 1–63 bytes with no control characters. The app name is truncated
+to 63 bytes for the menu. The initial limits are eight menus including File
+and 64 items including Quit and separators. The resulting native menu must fit
+the screen; installation failure returns -1 from `lg_app_run()`.
+
+Menu callbacks use the same `(app, user_data)` signature as close callbacks.
+They run on the application thread and can update LVGL widgets. Call
+`lg_app_quit()` to leave the loop, then clean up with `lg_app_close()` after run
+returns. `lg_menu_on_item(app, item, callback, user_data)` can replace a callback
+while running. To intercept Quit for saving or confirmation, replace the
+callback for `LG_MENU_QUIT`; it must explicitly call `lg_app_quit()` to exit.
+A NULL callback leaves an item without an action.
+
+Menu structure is fixed once the event loop starts. Runtime insertion/removal,
+keyboard shortcuts, submenus and checked items are not provided yet. Menus use
+AES, without LVGL window objects. MCP remains unimplemented. The Hello template
+shows Actions → Greet updating its label. `make menu-test MINTLIB=/absolute/path/to/mintlib`
+checks the AES object tree with the pinned GEMlib declarations under ASan/UBSan;
+`make app-test` also checks menu dispatch, copied labels and default Quit.
+
 ## Backends
 
 `src/platform.h` is the private boundary. Backends initialize LVGL, the display,

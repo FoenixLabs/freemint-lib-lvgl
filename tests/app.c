@@ -2,9 +2,28 @@
 #include "../src/platform.h"
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 static void (*native_close)(void *);static void *native_user;
 static unsigned steps,closed,requests;static int last_resizable;static int fail_open;
 static void (*scenario)(void);
+static void (*menu_action)(void *,int);static void *menu_user;static unsigned menu_calls;
+int lg_platform_menu(void *p,const lg_menu_model *m,void (*selected)(void *,int),void *user){
+ (void)p;assert(m->count>=1&&!strcmp(m->titles[0],"File"));
+ assert(m->items[0].menu==LG_MENU_FILE&&!strcmp(m->items[0].label,"Quit"));
+ if(m->count==2){assert(!strcmp(m->titles[1],"Edit"));assert(!strcmp(m->items[1].label,"Clear"));}
+ menu_action=selected;menu_user=user;return 1;
+}
+static void menu_callback(lg_app_t *app,void *user){
+ assert(user==&menu_calls);menu_calls++;lg_app_close(app);assert(lg_app_root(app));
+}
+static void menu_scenario(void){
+ lg_app_t *app=menu_user;
+ if(steps==1){
+  assert(!lg_menu_add(app,"Too late"));menu_action(menu_user,0);menu_action(menu_user,999);
+  menu_action(menu_user,2);assert(menu_calls==1);menu_action(menu_user,3);assert(menu_calls==1);
+ }
+ if(steps==2)menu_action(menu_user,LG_MENU_QUIT);
+}
 void *lg_platform_open(const char *title,unsigned width,unsigned height,int resizable,void (*close)(void *),void *user){
  (void)title;assert(resizable==0||resizable==1);last_resizable=resizable;if(fail_open)return NULL;
  lv_init();lv_display_create(width,height);
@@ -43,6 +62,14 @@ int main(void){
  assert(lv_obj_get_width(lg_app_root(app))==320&&lv_obj_get_height(lg_app_root(app))==240);
  lg_app_quit(app);steps=0;assert(!lg_app_run(app));assert(!steps);lg_app_close(app);
  assert(closed==2);
+ app=lg_app_init("Menus",600,400,0);assert(app);steps=0;
+ assert(!lg_menu_add(app,""));assert(!lg_menu_add_item(app,99,"Bad",NULL,NULL));
+ {char title[]="Edit",label[]="Clear";int edit=lg_menu_add(app,title);assert(edit==2);
+  assert(lg_menu_add_item(app,edit,label,menu_callback,&menu_calls)==2);
+  assert(lg_menu_add_separator(app,edit)==3);title[0]='X';label[0]='X';}
+ assert(!lg_menu_on_item(app,3,menu_callback,NULL));
+ scenario=menu_scenario;assert(!lg_app_run(app));assert(steps==2&&menu_calls==1);lg_app_close(app);
+
  app=lg_app_init_size("Fixed size",320,240);assert(app&&last_resizable==0);lg_app_close(app);lg_app_close(NULL);
  puts("Native surface API: direct root, dimensions, initialization/retry, close refusal/reentrancy, explicit quit and cleanup passed");
  return 0;
