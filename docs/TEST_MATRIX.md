@@ -255,3 +255,24 @@ The final Widgets binary was cross-built and deployed, not launched in this run.
 Native16/mono and other AES implementations remain untested for menus. The target
 was left at the desktop after Quit. The system source checks passed up to the
 existing baseline staging mismatch; full scripts/check.py did not pass that gate.
+
+## Menu shortcuts and File ordering (2026-10-29)
+
+Optional Ctrl+A–Z shortcuts are set before run with lg_menu_set_shortcut; Quit
+starts with ^Q. File entries added through LG_MENU_FILE appear before the built-in
+Quit, with stable callback/item IDs. Shortcuts share mouse-selection callbacks.
+
+Pixel/native-format/blend tests, probe, application/MCP tests and AES-tree tests
+passed under the existing sanitizer workflow. Tests cover duplicate/invalid
+shortcut rejection, lowercase normalization, clearing, late-change rejection,
+control/printable AES key encodings, modifier rejection, right-aligned labels,
+and File ordering with stable IDs. Both MiNT builds passed no-FPU scans.
+
+A2560Me native32/XaAES RM10 testing verified File displays Greet ^G then Quit ^Q;
+Ctrl+G updates the LVGL label, plain Q leaves the app open, and Ctrl+Q removes
+its process/window and restores the desktop menu. The Hello template demonstrates
+adding to File and assigning ^G. FTP SHA256 readback and /kern/95/fname verified
+LVHELLO.APP (63b752e536d896560e9c3e11b619773d3b46b93e54fdea91f6e822504efd6ad9).
+Evidence: ignored logs/rm10/20261029-lvgl-shortcuts. Widgets was built/deployed,
+not launched. Target left at desktop. Native16/mono and other AES versions were
+not retested; no system-wide baseline rebuild was performed.

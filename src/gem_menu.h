@@ -7,10 +7,11 @@
 typedef struct {
  OBJECT tree[LG_GEM_MENU_OBJECTS];int count;
  int item_id[LG_GEM_MENU_OBJECTS],title_id[LG_GEM_MENU_OBJECTS];
- char labels[LG_GEM_MENU_OBJECTS][LG_MENU_TEXT+4];
- char registered_name[LG_MENU_TEXT+3];int installed;
+ char labels[LG_GEM_MENU_OBJECTS][LG_MENU_TEXT+8];
+ char registered_name[LG_MENU_TEXT+3];int installed;char shortcuts[LG_ITEM_MAX];
 } lg_gem_menu;
 /* Pure tree construction, also tested on host with the real GEM headers. */
+int lg_gem_menu_shortcut(const lg_gem_menu *menu,unsigned key,unsigned modifiers);
 void lg_gem_menu_name(char out[LG_MENU_TEXT],const char *path);
 int lg_gem_menu_build(lg_gem_menu *out,const lg_menu_model *model,int cw,int ch,int screen_w,int screen_h);
 int lg_gem_set_menu(lg_gem *ctx,const lg_menu_model *menu,void (*selected)(void *,int),void *user);

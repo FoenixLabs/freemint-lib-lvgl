@@ -26,7 +26,7 @@ lg_app_t *lg_app_init(const char *title,unsigned width,unsigned height,unsigned 
  strncpy(app->menu.app_name,title?title:"LVGL",LG_MENU_TEXT-1);
  app->menu.count=1;strcpy(app->menu.titles[0],"File");
  app->menu.item_count=1;app->menu.items[0].menu=LG_MENU_FILE;strcpy(app->menu.items[0].label,"Quit");
- app->actions[0]=lg_app_quit_callback;
+ app->actions[0]=lg_app_quit_callback;app->menu.items[0].shortcut='Q';
  owner=app; /* Also rejects reentrant initialization during backend setup. */
  app->platform=lg_platform_open(title?title:"LVGL",width,height,(flags&LG_APP_RESIZABLE)!=0,request_close,app);
  if(!app->platform){error=lg_platform_error();free(app);owner=NULL;return NULL;}
@@ -80,4 +80,16 @@ int lg_menu_add_separator(lg_app_t *app,int menu){
 int lg_menu_on_item(lg_app_t *app,int item,lg_app_close_fn callback,void *user){
  if(!app||item<1||item>app->menu.item_count||app->menu.items[item-1].separator)return 0;
  app->actions[item-1]=callback;app->action_users[item-1]=user;return 1;
+}
+
+int lg_menu_set_shortcut(lg_app_t *app,int item,const char *shortcut){
+ int i;char key=0;
+ if(!app||app->started||item<1||item>app->menu.item_count||app->menu.items[item-1].separator){error="Cannot set shortcut: invalid item or event loop already started";return 0;}
+ if(shortcut&&*shortcut){
+  if(shortcut[0]!='^'||!shortcut[1]||shortcut[2]){error="Shortcut must be ^A through ^Z";return 0;}
+  key=shortcut[1];if(key>='a'&&key<='z')key-=32;
+  if(key<'A'||key>'Z'){error="Shortcut must be ^A through ^Z";return 0;}
+ }
+ for(i=0;key&&i<app->menu.item_count;i++)if(i!=item-1&&app->menu.items[i].shortcut==key){error="Shortcut is already assigned";return 0;}
+ app->menu.items[item-1].shortcut=key;return 1;
 }

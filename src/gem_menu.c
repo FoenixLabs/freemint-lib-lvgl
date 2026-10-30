@@ -1,5 +1,6 @@
 #include "gem_menu.h"
 #include <string.h>
+#include "lvgl_app.h"
 void lg_gem_menu_name(char out[LG_MENU_TEXT],const char *path){
  const char *base=path,*p,*end;unsigned n=0;
  if(!base)base="";
@@ -25,9 +26,10 @@ static void label(lg_gem_menu *m,int n,const char *s){
  m->tree[n].ob_spec.free_string=m->labels[n];
 }
 int lg_gem_menu_build(lg_gem_menu *m,const lg_menu_model *model,int cw,int ch,int sw,int sh){
- int menus=model->count+1,titles[LG_MENU_MAX+1],x=0,boxes,k,i;
+ int menus=model->count+1,titles[LG_MENU_MAX+1],x=0,boxes,k,i,order;
  if(cw<=0||ch<=0||sw<=0||sh<=0||model->count<1||model->count>LG_MENU_MAX||model->item_count<1||model->item_count>LG_ITEM_MAX)return 0;
  memset(m,0,sizeof *m);
+ for(i=0;i<model->item_count;i++)if(!model->items[i].separator)m->shortcuts[i]=model->items[i].shortcut;
  object(m,G_IBOX,0,0,sw,sh);object(m,G_BOX,0,0,sw,ch);object(m,G_IBOX,0,0,sw,ch);
  child(m,0,1);child(m,1,2);
  for(k=0;k<menus;k++){
@@ -41,7 +43,7 @@ int lg_gem_menu_build(lg_gem_menu *m,const lg_menu_model *model,int cw,int ch,in
   int box,width=0,rows=0,first,y=0,px=m->tree[titles[k]].ob_x;
   if(!k){width=(strlen(model->app_name)+2)*cw;rows=8;}
   else for(i=0;i<model->item_count;i++)if(model->items[i].menu==k){
-   int w=(strlen(model->items[i].label)+2)*cw;if(w>width)width=w;rows++;
+   int w=(strlen(model->items[i].label)+2+(model->items[i].shortcut?4:0))*cw;if(w>width)width=w;rows++;
   }
   if(width<8*cw)width=8*cw;
   if(!rows){rows=1;if(width<9*cw)width=9*cw;}
@@ -53,9 +55,17 @@ int lg_gem_menu_build(lg_gem_menu *m,const lg_menu_model *model,int cw,int ch,in
    /* Standard Desk layout: app/About, separator, six AES accessory slots. */
    for(i=1;i<8;i++){n=object(m,G_STRING,0,i*ch,width,ch);label(m,n,"");if(i==1){memset(m->labels[n],'-',width/cw);m->labels[n][width/cw]=0;}m->tree[n].ob_state=OS_DISABLED;child(m,box,n);}
   }else{
-   for(i=0;i<model->item_count;i++)if(model->items[i].menu==k){
+   /* Keep stable item IDs while putting the built-in Quit last in File. */
+   for(order=0;order<model->item_count;order++){
+    i=k==LG_MENU_FILE?(order+1)%model->item_count:order;
+    if(model->items[i].menu!=k)continue;
     int n=object(m,G_STRING,0,y,width,ch);label(m,n,model->items[i].label);child(m,box,n);y+=ch;
     m->title_id[n]=titles[k];
+    if(model->items[i].shortcut){
+     int columns=width/cw;memset(m->labels[n],' ',columns);m->labels[n][columns]=0;
+     memcpy(m->labels[n]+1,model->items[i].label,strlen(model->items[i].label));
+     m->labels[n][columns-3]='^';m->labels[n][columns-2]=model->items[i].shortcut;
+    }
     if(model->items[i].separator){memset(m->labels[n],'-',width/cw);m->labels[n][width/cw]=0;m->tree[n].ob_state=OS_DISABLED;}
     else m->item_id[n]=i+1;
    }
@@ -65,4 +75,16 @@ int lg_gem_menu_build(lg_gem_menu *m,const lg_menu_model *model,int cw,int ch,in
  m->tree[m->count-1].ob_flags|=OF_LASTOB;
  strcpy(m->registered_name,"  ");strcat(m->registered_name,model->app_name);
  return 1;
+}
+
+int lg_gem_menu_shortcut(const lg_gem_menu *m,unsigned key,unsigned modifiers){
+ unsigned ascii=key&255;int i;
+ if(!m||(modifiers&(K_CTRL|K_ALT|K_LSHIFT|K_RSHIFT))!=K_CTRL)return 0;
+ /* AES may return a control character or the printable letter. Caps Lock
+  * does not alter shortcut identity. Unmatched keys remain available to LVGL. */
+ if(ascii>=1&&ascii<=26)ascii+='A'-1;
+ else if(ascii>='a'&&ascii<='z')ascii-=32;
+ if(ascii<'A'||ascii>'Z')return 0;
+ for(i=0;i<LG_ITEM_MAX;i++)if((unsigned char)m->shortcuts[i]==ascii)return i+1;
+ return 0;
 }

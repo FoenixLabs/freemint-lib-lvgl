@@ -97,7 +97,7 @@ basename without spaces or its extension (`LVHELLO.APP` becomes `LVHELLO`).
 The GEM backend reads MiNT’s process filename, falling back to the C runtime
 invocation name and finally `LVGL` when no executable identity is available.
 The dropdown contains the application name and a simple About alert; on
-MultiTOS/XaAES the application also registers that name in the task list. File contains Quit, whose default callback calls
+MultiTOS/XaAES the application also registers that name in the task list. File contains Quit with the `^Q` (Ctrl+Q) shortcut, whose default callback calls
 `lg_app_quit()`. This is independent of the native window close callback.
 
 Add menus and items after initialization and before the first event loop:
@@ -115,7 +115,27 @@ int clear_item = lg_menu_add_item(app, edit, "Clear", clear, label);
 if (!edit || !clear_item) { /* inspect lg_app_error(), clean up, return */ }
 ```
 
-Use `LG_MENU_FILE` to add items to File and `lg_menu_add_separator(app, menu)`
+Use `LG_MENU_FILE` to add items to the existing File menu. Quit is special: it
+always appears last, after all added File items and separators, without changing
+any returned item IDs. For example:
+
+```c
+int save = lg_menu_add_item(app, LG_MENU_FILE, "Save", save_callback, user_data);
+if (!save || !lg_menu_set_shortcut(app, save, "^S")) { /* handle error */ }
+```
+
+`lg_menu_set_shortcut(app, item, shortcut)` configures an optional Ctrl+letter
+shortcut before the first run. Use `"^A"` through `"^Z"`; lowercase letters are
+normalized. NULL or an empty string clears the shortcut. It returns 1 on success,
+0 on an invalid item, separator, unsupported shortcut, duplicate assignment or
+attempt to change it after run starts. Failed changes preserve the old shortcut.
+Shortcuts are unique across all menus, including the default `^Q`. They are drawn
+in an aligned column and invoke the same callback as a mouse selection when the
+application window is topmost. Matching keys are consumed; other keys continue
+to LVGL. Caps Lock is ignored, while Shift or Alt combinations do not match.
+Replacing the Quit callback also changes what Ctrl+Q does.
+
+Use `lg_menu_add_separator(app, menu)`
 for a disabled separator. Menu IDs and item IDs are separate namespaces;
 positive IDs indicate success, zero indicates failure. Labels are copied and
 must contain 1–63 bytes with no control characters. The app name is truncated
@@ -132,9 +152,9 @@ callback for `LG_MENU_QUIT`; it must explicitly call `lg_app_quit()` to exit.
 A NULL callback leaves an item without an action.
 
 Menu structure is fixed once the event loop starts. Runtime insertion/removal,
-keyboard shortcuts, submenus and checked items are not provided yet. Menus use
+other shortcut combinations, submenus and checked items are not provided yet. Menus use
 AES, without LVGL window objects. MCP remains unimplemented. The Hello template
-shows Actions → Greet updating its label. `make menu-test MINTLIB=/absolute/path/to/mintlib`
+shows File → Greet (`^G`) updating its label, followed by Quit (`^Q`). `make menu-test MINTLIB=/absolute/path/to/mintlib`
 checks the AES object tree with the pinned GEMlib declarations under ASan/UBSan;
 `make app-test` also checks menu dispatch, copied labels and default Quit.
 

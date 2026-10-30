@@ -17,8 +17,9 @@ int main(void)
     lv_label_set_text(label, "Hello from LVGL!");
     lv_obj_center(label);
 
-    int actions = lg_menu_add(app, "Actions");
-    if (!actions || !lg_menu_add_item(app, actions, "Greet", greet, label)) {
+    /* File is supplied by the library; new entries appear before Quit. */
+    int greet_item = lg_menu_add_item(app, LG_MENU_FILE, "Greet", greet, label);
+    if (!greet_item || !lg_menu_set_shortcut(app, greet_item, "^G")) {
         lg_app_close(app); return 1;
     }
 

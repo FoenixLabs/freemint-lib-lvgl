@@ -30,6 +30,10 @@ enum { LG_MENU_FILE = 1, LG_MENU_QUIT = 1 };
 int lg_menu_add(lg_app_t *app, const char *title);
 int lg_menu_add_item(lg_app_t *app, int menu, const char *label,
                      lg_app_close_fn callback, void *user);
+/* Set before run: "^A".."^Z" (Ctrl+letter), NULL/"" clears. Unique per app.
+ * Returns 1 on success, 0 on invalid/duplicate shortcut. Quit defaults to ^Q.
+ * Add File entries using LG_MENU_FILE; Quit always remains the last row. */
+int lg_menu_set_shortcut(lg_app_t *app, int item, const char *shortcut);
 int lg_menu_add_separator(lg_app_t *app, int menu);
 /* May also replace the default Quit callback; callable while running. */
 int lg_menu_on_item(lg_app_t *app, int item, lg_app_close_fn callback, void *user);

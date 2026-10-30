@@ -286,6 +286,8 @@ int lg_gem_step(lg_gem *c){
  if(!c->running)return 0;
  if(top==c->win){
   if(events&MU_KEYBD){
+   int item=lg_gem_menu_shortcut(c->menu,(unsigned short)key,(unsigned short)mod);
+   if(item&&c->menu_selected){c->menu_selected(c->menu_user,item);return c->running;}
    unsigned scan=((unsigned short)key)>>8,ascii=key&255;c->key=ascii;
    #ifdef LG_WIDGETS_DEMO
    if(scan==0x41&&!c->lite){extern void lg_widgets_reduce_effects(lv_obj_t *);c->lite=1;lg_widgets_reduce_effects(lv_screen_active());return c->running;} /* F7 */

@@ -11,6 +11,7 @@ int lg_platform_menu(void *p,const lg_menu_model *m,void (*selected)(void *,int)
  (void)p;assert(m->count>=1&&!strcmp(m->titles[0],"File"));
  assert(m->items[0].menu==LG_MENU_FILE&&!strcmp(m->items[0].label,"Quit"));
  if(m->count==2){assert(!strcmp(m->titles[1],"Edit"));assert(!strcmp(m->items[1].label,"Clear"));}
+ assert(m->items[0].shortcut=='Q');if(m->count==2)assert(m->items[1].shortcut=='C');
  menu_action=selected;menu_user=user;return 1;
 }
 static void menu_callback(lg_app_t *app,void *user){
@@ -19,7 +20,7 @@ static void menu_callback(lg_app_t *app,void *user){
 static void menu_scenario(void){
  lg_app_t *app=menu_user;
  if(steps==1){
-  assert(!lg_menu_add(app,"Too late"));menu_action(menu_user,0);menu_action(menu_user,999);
+  assert(!lg_menu_add(app,"Too late"));assert(!lg_menu_set_shortcut(app,2,"^X"));menu_action(menu_user,0);menu_action(menu_user,999);
   menu_action(menu_user,2);assert(menu_calls==1);menu_action(menu_user,3);assert(menu_calls==1);
  }
  if(steps==2)menu_action(menu_user,LG_MENU_QUIT);
@@ -68,6 +69,11 @@ int main(void){
   assert(lg_menu_add_item(app,edit,label,menu_callback,&menu_calls)==2);
   assert(lg_menu_add_separator(app,edit)==3);title[0]='X';label[0]='X';}
  assert(!lg_menu_on_item(app,3,menu_callback,NULL));
+ assert(!lg_menu_set_shortcut(app,3,"^C"));assert(!lg_menu_set_shortcut(app,999,"^C"));
+ assert(!lg_menu_set_shortcut(app,2,"^Q"));assert(!lg_menu_set_shortcut(app,2,"Ctrl+C"));
+ assert(!lg_menu_set_shortcut(app,2,"^"));assert(!lg_menu_set_shortcut(app,2,"^1"));
+ assert(lg_menu_set_shortcut(app,2,"^c"));assert(lg_menu_set_shortcut(app,2,NULL));
+ assert(lg_menu_set_shortcut(app,2,"^C"));
  scenario=menu_scenario;assert(!lg_app_run(app));assert(steps==2&&menu_calls==1);lg_app_close(app);
 
  app=lg_app_init_size("Fixed size",320,240);assert(app&&last_resizable==0);lg_app_close(app);lg_app_close(NULL);
