@@ -9,8 +9,10 @@ extern "C" {
  * Build with exactly one backend. No native platform types escape this API. */
 typedef struct lg_app lg_app_t;
 typedef void (*lg_app_close_fn)(lg_app_t *, void *);
-lg_app_t *lg_app_init(const char *title);
-/* Optional explicit preferred surface dimensions (GEM defaults to 600x400). */
+enum { LG_APP_RESIZABLE = 1u };
+/* Client-area dimensions; flags=0 gives a fixed native window. */
+lg_app_t *lg_app_init(const char *title, unsigned width, unsigned height, unsigned flags);
+/* Compatibility convenience for a fixed-size surface (flags=0). */
 lg_app_t *lg_app_init_size(const char *title, unsigned width, unsigned height);
 const char *lg_app_error(void);
 int lg_app_run(lg_app_t *app);

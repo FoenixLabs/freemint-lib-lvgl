@@ -10,7 +10,7 @@ Start with `examples/hello.c`:
 #include "lvgl_app.h"
 int main(void)
 {
-    lg_app_t *app = lg_app_init("My application");
+    lg_app_t *app = lg_app_init("My application", 640, 480, LG_APP_RESIZABLE);
     if (!app) return 1;
     lg_app_on_close(app, lg_app_quit_callback, NULL);
 
@@ -46,10 +46,32 @@ as the build script arranges. Dependency files remain unmodified.
 
 ## Surface and lifecycle
 
-There is one application and one native surface per process. GEM creates a fixed
-600x400 client area; `lg_app_init_size()` accepts explicit dimensions instead.
-GEM owns the title bar, movement, closer, visible rectangles and exposure. LVGL
-owns only the content. Native resize/full-size/iconification remain unsupported.
+There is one application and one native surface per process. Supply the initial
+client width and height and flags directly to `lg_app_init()`:
+
+```c
+lg_app_init("Fixed", 600, 400, 0);
+lg_app_init("Resizable", 640, 480, LG_APP_RESIZABLE);
+```
+
+These are alternatives, not two simultaneously initialized apps. The compatibility
+function `lg_app_init_size(title, width, height)` selects a fixed-size window.
+Unknown flags and zero dimensions fail initialization; resizable windows require
+at least 64x48 client pixels. The initial decorated window must fit the desktop.
+
+GEM owns the title bar, movement, closer, size grip, visible rectangles and
+exposure. LVGL owns only the content. With LG_APP_RESIZABLE, dragging the native
+bottom-right size grip changes the client surface and LVGL display resolution.
+Root SIZE_CHANGED and display RESOLUTION_CHANGED events follow the LVGL update;
+percentage/flex/aligned layouts can adapt, while absolute coordinates remain the
+application's responsibility. The Hello label stays centered after resizing.
+
+Resize requests are clamped to a minimum64x48 client area and the desktop's outer
+size. New backing/draw buffers are prepared before changing geometry. If allocation
+or preparation fails, the old window size and buffers are retained. Existing
+widgets and their state survive; cached scroll pixels are discarded and the
+surface is redrawn. Both old and new buffers briefly coexist, so growth needs
+additional memory. Full-size/maximize and iconification remain unsupported.
 The helper does not create any LVGL window objects; LV_USE_WIN is disabled.
 
 The native closer and GEM AP_TERM deliver close requests through
@@ -95,3 +117,5 @@ The `lg_window_*` API and the two-window example were removed. Replace window
 creation/content lookup with `lg_app_root(app)` and register the close handler
 with `lg_app_on_close()`. `lg_app_quit_callback` now takes an application handle.
 Initialization and event-loop entry remain `lg_app_init()` and `lg_app_run()`.
+The newer init signature takes `(title, width, height, flags)`; replace former
+one-argument calls with explicit dimensions and `0` or `LG_APP_RESIZABLE`.

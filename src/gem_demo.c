@@ -13,7 +13,7 @@
 
 typedef char abi_check[(sizeof(int)==4&&sizeof(short)==2&&sizeof(MFDB)==20)?1:-1];
 struct lg_gem {
- short app,win,vdi,opened,mouse_down;unsigned planes;unsigned width,height;size_t stride;
+ short app,win,vdi,opened,mouse_down,kind;int resizable;unsigned planes;unsigned width,height;size_t stride;
  MFDB backing,screen;void *strip;lv_draw_buf_t native_draw;int direct;lg_scroll_cache *cache;int cache_disabled,lite;
  lv_display_t *display;lv_indev_t *pointer,*keyboard;lv_group_t *group;
  lv_point_t pos;lv_indev_state_t pointer_state,key_state;uint32_t key;
@@ -120,11 +120,12 @@ void lg_gem_close(lg_gem *c){
  lg_render_native(NULL,0);free(c->strip);free(c->backing.fd_addr);
  if(c->app>=0){lv_deinit();appl_exit();}free(c);
 }
-lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
+lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title,int resizable){
  lg_gem *c=calloc(1,sizeof(*c));short in[11],out[57],cw,ch,bw,bh,x,y,w,h,ox,oy,ow,oh;
  size_t size;int i;short report[272];unsigned eddi;
  if(!c)return NULL;
- c->app=-1;c->win=-1;
+ c->app=-1;c->win=-1;c->resizable=resizable;
+ c->kind=NAME|CLOSER|MOVER|(resizable?SIZER:0);
  if(!width||!height||width>4096||height>4096){free(c);return NULL;}
  c->app=appl_init();if(c->app<0){free(c);return NULL;}
  lv_init();lv_tick_set_cb(ticks);c->width=width;c->height=height;
@@ -134,7 +135,7 @@ lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  if(!c->planes){form_alert(1,"[1][Unsupported VDI colour layout.|Need validated RGB565 or XRGB8888.][OK]");goto fail;}
  if(!lg_surface_size(width,height,c->planes,&c->stride,&size))goto fail;
  wind_get(0,WF_WORKXYWH,&x,&y,&w,&h);
- wind_calc(WC_BORDER,NAME|CLOSER|MOVER,0,0,width,height,&ox,&oy,&ow,&oh);
+ wind_calc(WC_BORDER,c->kind,0,0,width,height,&ox,&oy,&ow,&oh);
  if(ow>w||oh>h){form_alert(1,"[1][Application needs a larger desktop.|Use at least 640 x 480.][OK]");goto fail;}
  c->direct=c->planes==32;
  c->backing.fd_addr=calloc(1,size);if(!c->direct)c->strip=malloc(width*height*3U);
@@ -156,7 +157,7 @@ lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  lv_indev_set_type(c->pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_user_data(c->pointer,c);lv_indev_set_read_cb(c->pointer,pointer_read);
  lv_indev_set_type(c->keyboard,LV_INDEV_TYPE_KEYPAD);lv_indev_set_user_data(c->keyboard,c);lv_indev_set_read_cb(c->keyboard,key_read);
  lv_indev_set_group(c->keyboard,c->group);
- c->win=wind_create(NAME|CLOSER|MOVER,x,y,w,h);if(c->win<0)goto fail;
+ c->win=wind_create(c->kind,x,y,w,h);if(c->win<0)goto fail;
  wind_set_str(c->win,WF_NAME,title);
  /* XaAES WF_WHEEL takes enable, mode (the GEMlib prose omits enable).
   * Request messages only when AES advertises this extension. */
@@ -168,6 +169,47 @@ lg_gem *lg_gem_open(unsigned width,unsigned height,const char *title){
  c->opened=1;c->running=1;return c;
 fail:lg_gem_close(c);return NULL;
 }
+/* Prepare both allocations before changing AES geometry or LVGL state.
+ * This runs between LVGL refreshes on the single AES thread. */
+static int resize_window(lg_gem *c,short bx,short by,short bw,short bh){
+ short wx,wy,ww,wh,dx,dy,dw,dh,ox,oy,ow,oh;
+ size_t stride,size;void *backing,*strip=NULL,*old_backing,*old_strip;
+ lv_draw_buf_t draw;unsigned draw_stride,draw_size;
+ if(!c->resizable)return 0;
+ wind_get(0,WF_WORKXYWH,&dx,&dy,&dw,&dh);
+ wind_calc(WC_BORDER,c->kind,0,0,64,48,&ox,&oy,&ow,&oh);
+ if(bw<ow)bw=ow;
+ if(bh<oh)bh=oh;
+ if(bw>dw)bw=dw;
+ if(bh>dh)bh=dh;
+ wind_calc(WC_WORK,c->kind,bx,by,bw,bh,&wx,&wy,&ww,&wh);
+ if(ww<64||wh<48||!lg_surface_size(ww,wh,c->planes,&stride,&size))return 0;
+ if((unsigned)ww==c->width&&(unsigned)wh==c->height)
+  return wind_set(c->win,WF_CURRXYWH,bx,by,bw,bh);
+ backing=calloc(1,size);if(!backing)return 0;
+ draw_stride=c->direct?stride:lv_draw_buf_width_to_stride(ww,LV_COLOR_FORMAT_RGB888);
+ draw_size=c->direct?size:draw_stride*(unsigned)wh;
+ if(!c->direct){strip=malloc(draw_size);if(!strip){free(backing);return 0;}}
+ if(lv_draw_buf_init(&draw,ww,wh,c->direct?LV_COLOR_FORMAT_XRGB8888:LV_COLOR_FORMAT_RGB888,
+                     draw_stride,c->direct?backing:strip,draw_size)!=LV_RESULT_OK){free(strip);free(backing);return 0;}
+ if(!wind_set(c->win,WF_CURRXYWH,bx,by,bw,bh)){free(strip);free(backing);return 0;}
+ lg_cache_delete(c->cache);c->cache=NULL;
+ lv_indev_reset(c->pointer,NULL);c->captured=0;c->pointer_state=LV_INDEV_STATE_RELEASED;
+ old_backing=c->backing.fd_addr;old_strip=c->strip;
+ c->backing.fd_addr=backing;c->strip=strip;c->stride=stride;c->width=ww;c->height=wh;
+ c->backing.fd_w=ww;c->backing.fd_h=wh;c->backing.fd_wdwidth=(ww+15)/16;
+ c->native_draw=draw;lv_display_set_draw_buffers(c->display,&c->native_draw,NULL);
+ if(c->direct)lg_render_native(backing,size);
+ c->dirty=0;
+ if(c->pos.x>=ww)c->pos.x=ww-1;
+ if(c->pos.y>=wh)c->pos.y=wh-1;
+ /* Bind the new buffers first: resolution-change callbacks may render. */
+ lv_display_set_resolution(c->display,ww,wh);
+ free(old_strip);free(old_backing);
+ lv_obj_invalidate(lv_display_get_screen_active(c->display));
+ lv_refr_now(c->display);present_damage(c);
+ return 1;
+}
 #ifdef LG_WIDGETS_DEMO
 static void cache_damage(void *user,const lv_area_t *a){lg_gem *c=user;c->damage=(lg_rect){a->x1,a->y1,lv_area_get_width(a),lv_area_get_height(a)};c->dirty=1;}
 #endif
@@ -177,6 +219,7 @@ int lg_gem_step(lg_gem *c){
  #ifdef LG_WIDGETS_DEMO
  if(c->direct&&!c->cache){lv_obj_t *tabs=lv_obj_get_child(lv_screen_active(),0);
   if(tabs&&lv_obj_check_type(tabs,&lv_tabview_class))c->cache=lg_cache_create(c->display,lv_obj_get_child(lv_tabview_get_content(tabs),0),c->backing.fd_addr,c->stride,cache_damage,c);
+  if(c->cache_disabled)lg_cache_enable(c->cache,0);
  }
  #endif
  delay=lv_timer_handler();
@@ -190,6 +233,7 @@ int lg_gem_step(lg_gem *c){
   if(msg[0]==AP_TERM)request_close(c);
   else if(msg[3]==c->win)switch(msg[0]){
    case WM_CLOSED:request_close(c);break;
+   case WM_SIZED:resize_window(c,msg[4],msg[5],msg[6],msg[7]);break;
    case WM_TOPPED:wind_set(c->win,WF_TOP,0,0,0,0);break;
    case WM_MOVED:wind_set(c->win,WF_CURRXYWH,msg[4],msg[5],msg[6],msg[7]);break;
    case WM_WHEEL:{

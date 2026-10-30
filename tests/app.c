@@ -3,10 +3,10 @@
 #include <assert.h>
 #include <stdio.h>
 static void (*native_close)(void *);static void *native_user;
-static unsigned steps,closed,requests;static int fail_open;
+static unsigned steps,closed,requests;static int last_resizable;static int fail_open;
 static void (*scenario)(void);
-void *lg_platform_open(const char *title,unsigned width,unsigned height,void (*close)(void *),void *user){
- (void)title;if(fail_open)return NULL;
+void *lg_platform_open(const char *title,unsigned width,unsigned height,int resizable,void (*close)(void *),void *user){
+ (void)title;assert(resizable==0||resizable==1);last_resizable=resizable;if(fail_open)return NULL;
  lv_init();lv_display_create(width,height);
  native_close=close;native_user=user;return lv_display_get_default();
 }
@@ -27,9 +27,11 @@ static void close_scenario(void){
 }
 int main(void){
  lg_app_t *app;
- fail_open=1;assert(!lg_app_init("fail"));assert(*lg_app_error());fail_open=0;
+ fail_open=1;assert(!lg_app_init("fail",600,400,0));assert(*lg_app_error());fail_open=0;
  assert(!lg_app_init_size("bad",0,400));
- app=lg_app_init("Native surface");assert(app);assert(!lg_app_init("second"));
+ assert(!lg_app_init("flags",600,400,2));
+ assert(!lg_app_init("too small",32,32,LG_APP_RESIZABLE));
+ app=lg_app_init("Native surface",600,400,0);assert(app);assert(!lg_app_init("second",600,400,0));
  lv_obj_t *root=lg_app_root(app);
  assert(root==lv_screen_active());assert(lv_obj_get_child_count(root)==0);
  assert(lv_obj_get_width(root)==600&&lv_obj_get_height(root)==400);
@@ -37,10 +39,11 @@ int main(void){
  assert(lv_obj_get_child_count(root)==1); /* No nested window/header/closer. */
  scenario=close_scenario;assert(!lg_app_run(app));assert(steps==3&&requests==1);
  lg_app_close(app);assert(closed==1);
- app=lg_app_init_size("Custom size",320,240);assert(app);
+ app=lg_app_init("Custom size",320,240,LG_APP_RESIZABLE);assert(app);assert(last_resizable==1);
  assert(lv_obj_get_width(lg_app_root(app))==320&&lv_obj_get_height(lg_app_root(app))==240);
  lg_app_quit(app);steps=0;assert(!lg_app_run(app));assert(!steps);lg_app_close(app);
- assert(closed==2);lg_app_close(NULL);
+ assert(closed==2);
+ app=lg_app_init_size("Fixed size",320,240);assert(app&&last_resizable==0);lg_app_close(app);lg_app_close(NULL);
  puts("Native surface API: direct root, dimensions, initialization/retry, close refusal/reentrancy, explicit quit and cleanup passed");
  return 0;
 }

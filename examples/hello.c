@@ -2,7 +2,7 @@
 #include "lvgl_app.h"
 int main(void)
 {
-    lg_app_t *app = lg_app_init("Hello LVGL");
+    lg_app_t *app = lg_app_init("Hello LVGL", 640, 480, LG_APP_RESIZABLE);
     if (!app) return 1;
 
     lg_app_on_close(app, lg_app_quit_callback, NULL);

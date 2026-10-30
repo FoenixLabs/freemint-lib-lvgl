@@ -199,3 +199,30 @@ invoked its explicit quit callback and removed the process. It was relaunched
 and left running. FTP SHA256 readback and /kern/59/fname confirmed the deployed
 LVHELLO.APP. Evidence is in ignored logs/rm10/20261029-lvgl-single. Widgets was
 cross-built/deployed and host-tested, not relaunched during this revision.
+
+## Native resize and explicit initialization dimensions
+
+lg_app_init now takes title, client width, client height and flags. With
+LG_APP_RESIZABLE, GEM provides its native size grip and WM_SIZED updates the LVGL
+display and owned backing/draw buffers. flags0 keeps a fixed-size window; the
+Widgets demo explicitly retains600x400 fixed. The Hello template selects640x480
+resizable. lg_app_init_size remains a fixed-size compatibility convenience.
+
+Host API tests passed explicit dimensions, flag propagation, unknown-flag rejection,
+minimum-size validation, fixed-size convenience, close handling and lifecycle.
+MCP stub and native Widgets renderer/cache smoke tests passed. Component tests,
+probe, both target builds and FPU scans passed. No lv_win is used.
+
+A2560Me RM10 native32 tests passed initial launch, shrinking by123x77 and growing
+by160x100 via the actual GEM size grip. The label re-centered without artifacts,
+including odd client widths and changed MFDB padding. Deployment was verified by
+SHA256 readback and the running /kern executable path. Evidence is in ignored
+logs/rm10/20261029-lvgl-resize. Allocation failure and AES wind_set failure paths
+preserve old state by preparation-before-mutation, but failure injection and
+native16/mono resize runtime tests have not been performed.
+
+A drag below minimum clamped to a64x48 client area; growing back by576x432
+restored640x480 and the centered label without stale scroll/draw artifacts.
+The resizable Hello sample is left running. Full-size/maximize and iconification
+remain outside this change. The fixed Widgets build was deployed but not launched
+in this run; its renderer/cache smoke test ran headlessly.

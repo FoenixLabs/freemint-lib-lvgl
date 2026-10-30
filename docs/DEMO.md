@@ -29,7 +29,8 @@ Wheel events outside the client or during a captured button drag are ignored. Ta
 traverse keyboard focus; Enter activates; arrows and Backspace are translated.
 Text input currently accepts ASCII. The native closer requests exit through the demo's explicit application callback.
 Escape is passed to LVGL and does not exit. Drag the title
-bar to move the window. Resize/full-size/iconification remain future work.
+bar to move the window. The Widgets sample remains fixed-size; the helper supports optional native resizing
+for applications that select LG_APP_RESIZABLE. Full-size/iconification remain future work.
 The virtual keyboard never appears when focusing a text field; focus also keeps
 the full window height available. The unused keyboard widget support is compiled
 because the unmodified upstream demo references it, but the wrapper deletes its

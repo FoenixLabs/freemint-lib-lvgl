@@ -12,14 +12,16 @@ static void request_close(void *user){
  if(!app->close||app->dispatching)return;
  app->dispatching=1;app->close(app,app->user);app->dispatching=0;
 }
-lg_app_t *lg_app_init(const char *title){return lg_app_init_size(title,600,400);}
-lg_app_t *lg_app_init_size(const char *title,unsigned width,unsigned height){
+lg_app_t *lg_app_init_size(const char *title,unsigned width,unsigned height){return lg_app_init(title,width,height,0);}
+lg_app_t *lg_app_init(const char *title,unsigned width,unsigned height,unsigned flags){
  lg_app_t *app;error=NULL;
  if(owner){error="An application is already initialized";return NULL;}
+ if(flags&~LG_APP_RESIZABLE){error="Unknown application flags";return NULL;}
+ if((flags&LG_APP_RESIZABLE)&&(width<64||height<48)){error="Resizable surfaces need at least 64x48 pixels";return NULL;}
  if(!width||!height){error="Surface dimensions must be positive";return NULL;}
  app=calloc(1,sizeof *app);if(!app){error="Cannot allocate application";return NULL;}
  owner=app; /* Also rejects reentrant initialization during backend setup. */
- app->platform=lg_platform_open(title?title:"LVGL",width,height,request_close,app);
+ app->platform=lg_platform_open(title?title:"LVGL",width,height,(flags&LG_APP_RESIZABLE)!=0,request_close,app);
  if(!app->platform){error=lg_platform_error();free(app);owner=NULL;return NULL;}
  return app;
 }
